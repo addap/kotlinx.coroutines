@@ -20,14 +20,18 @@ Theorem getAndSet_spec (ℓ: loc) (v: val):
 Proof.
   iIntros (Φ) "AU". iLöb as "IH". wp_lam. wp_pures.
   wp_bind (!_)%E. iMod "AU" as (k) "[[Hℓ %] [HClose _]]".
-  wp_load. iMod ("HClose" with "[Hℓ]") as "AU"; first by iSplit. iModIntro.
+  wp_load. iMod ("HClose" with "[Hℓ]") as "AU". by iSplit. iModIntro.
   wp_let. wp_bind (CmpXchg _ _ _)%E. iMod "AU" as (k') "[[Hℓ %] HClose]".
-  destruct (decide (k = k')) as [[= ->]|Hx];
-    [wp_cmpxchg_suc|wp_cmpxchg_fail];
-    [iDestruct "HClose" as "[_ HClose]" | iDestruct "HClose" as "[HClose _]"].
-  all: iMod ("HClose" with "[Hℓ]") as "HΦ"; first by auto.
-  all: iModIntro; wp_pures; auto.
-  by wp_apply "IH".
+  destruct (decide (k = k')) as [[= ->]|Hx].
+  - wp_cmpxchg_suc.
+    iDestruct "HClose" as "[_ HClose]".
+    iMod ("HClose" with "[Hℓ]") as "HΦ"; first by iAssumption.
+    iModIntro. wp_pures. by iAssumption.
+  - wp_cmpxchg_fail.
+    iDestruct "HClose" as "[HClose _]".
+    iMod ("HClose" with "[Hℓ]") as "HΦ"; first by auto.
+    iModIntro. wp_pures.
+    by wp_apply "IH".
 Qed.
 
 End getAndSetProof.

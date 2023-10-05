@@ -415,6 +415,8 @@ Proof.
     by apply (cleanedAndPointers_contents_nonzero pointers slots); first lia.
 Qed.
 
+(* prev contains either null or a reference to a segment s0 such that s0 .id < s.id and all the segments between
+s0 and s are cancelled. *)
 Lemma getPrev_spec γ γs id v:
   {{{ inv N (concurrentLinkedList_invariant γ) ∗ segment_in_list γ γs id v }}}
     getPrev (base segment_interface) v

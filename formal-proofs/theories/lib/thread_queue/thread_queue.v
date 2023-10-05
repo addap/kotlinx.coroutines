@@ -22,7 +22,19 @@ Definition fromSome: val :=
                InjL "v" => "undefined"
              | InjR "v" => "v"
              end.
+(* 
+  1. create a new future
+  2. get new cell (cellPtr is segment + index, cell is the actual reference)
+  3. try to set cell to future
+    a. if CAS succeeded, return the future and cellptr
+    b. if CAS failed, read cell
+       if cell is not Broken, assume there is already a value and try to take it
+       b.a. if taking succeeded, complete the future and return completed future without cellptr
+       b.b. if taking failed return None
 
+  The Broken status only happens in the synchronous resumption mode where `resume` waits for a suspend.
+  So in our simplified case, suspend should always succeed (the CAS to TAKEN should always work)
+ *)
 Definition suspend: val :=
   λ: "enqIterator",
   let: "future" := emptyFuture #() in
@@ -36,20 +48,37 @@ Definition suspend: val :=
        then tryCompleteFuture "future" (fromSome "value") ;; SOME ("future", #())
        else NONEV.
 
+(* a.d. explanantion of parameters
+
+"maxWait": in synchronouse resumption, how long to spin waiting, called "MAX_SPIN_CYCLES" in the paper
+"shouldAdjust": set SMART CANCELLATION mode
+"mayBreakCells": set SYNCHRONOUS resumption mode (wait until value is taken)
+"waitForResolution": set SYNCHRONOUS resumption mode (wait until thread has continued)  
+"deqIterator": iterator to get cells from
+"returnRefusedValue": how to handle a refused cell
+"value": the value to resume with
+*)
 Definition tryResume: val :=
   λ: "maxWait" "shouldAdjust" "mayBreakCells" "waitForResolution" "deqIterator"
      "returnRefusedValue" "value",
   match: iteratorStepOrIncreaseCounter
            array_interface "shouldAdjust" "deqIterator" with
+      (* a.d. #1 apparently means the cell is cancelled. *)
       NONE => #1
+      (* a.d. if not cancelled, we get the same kind of cellPtr as in suspend. *)
     | SOME "cellPtr" =>
+      (* a.d. same as in Eio. *)
       cellPointerCleanPrev array_interface "cellPtr" ;;
       (rec: "modify_cell" <> :=
+        (* a.d. TODO not sure why we do this operation in the loop. *)
          let: "cell" := derefCellPointer array_interface "cellPtr" in
          let: "cellState" := !"cell" in
          if: "cellState" = NONEV then
            if: CAS "cell" NONEV (SOME "value") then
              if: "mayBreakCells" then
+               (* a.d. busy wait for the cell to be taken. 
+                  if the busy wait is over, set the cell to broken and return #2.
+                  NOT NEEDED IN EIO *)
                if: (rec: "wait" "n" :=
                       ("n" ≠ #0) && ((!"cell" = TAKENV) || "wait" ("n" - #1)))
                      "maxWait"
@@ -57,10 +86,12 @@ Definition tryResume: val :=
                then #0
                else #2
              else #0
+           (* a.d. if CAS failed, then the cell is not NONEV so we will hit another branch. *)
            else "modify_cell" #()
          else if: "cellState" = CANCELLEDV then #1
          else if: "cellState" = REFUSEDV then "returnRefusedValue" "value" ;; #0
          else match: "cellState" with
+         (* finally, we have a future in the cell, so we try to complete it *)
                 InjR "x" => "undefined"
               | InjL "th" => let: "success" := tryCompleteFuture "th" "value" in
                             if: "success" then
@@ -119,6 +150,15 @@ Definition awaitThreadQueueFuture: val :=
 
 Definition fillThreadQueueFuture: val := λ: "v", (completeFuture "v", #()).
 
+(* a.d. explanation of parameters
+
+"immediate": SIMPLE cancellation mode 
+"maxWait", "mayBreakCells", "waitForResolution", "deqIterator": to pass to a concurrent resume ()
+"checkCancellation": user supplied check if cancellation is allowed, in the paper called "onCancellation"
+"returnRefusedValue": user supplied function for handling a refused value, in the paper called "completeRefusedResume"
+"returnValue": called when the resume returns false, isn't even in the paper. But makes sense cause otherwise the value is lost if resume returns false.
+"f": the future to cancel
+*)
 Definition tryCancelThreadQueueFuture': val :=
   λ: "immediate" "maxWait" "mayBreakCells" "waitForResolution"
      "deqIterator" "checkCancellation" "returnRefusedValue" "returnValue" "f",
@@ -239,6 +279,25 @@ Let NDeq := N .@ "deq".
 Let NEnq := N .@ "enq".
 Notation iProp := (iProp Σ).
 
+Goal forall (P P' Q Q': iProp),
+  P -∗ Q -∗ ((P -∗ P') ∗ (Q -∗ Q')) -∗ P' ∗ Q'.
+Proof.
+  intros.
+  iIntros "P Q [Pi Qi]".
+  iSpecialize ("Pi" with "P").
+  iSpecialize ("Qi" with "Q").
+  iFrame.
+Qed.
+
+Goal forall (P P' Q Q': iProp),
+  P -∗ Q -∗ ((P -∗ P') ∧ (Q -∗ Q')) -∗ P' ∧ Q'.
+Proof.
+  intros.
+  iIntros "P Q PQi". iSplit.
+  - iApply "PQi". iFrame.
+  - iApply "PQi". iFrame.
+Qed.
+
 Record thread_queue_parameters :=
   ThreadQueueParameters
     {
@@ -332,6 +391,7 @@ Definition cancellation_registration_token (γtq: gname) (i: nat): iProp :=
 Definition cell_cancelling_token (γtq: gname) (i: nat): iProp :=
   inhabited_rendezvous_state γtq i (Some (Cinr (Cinr (1, ε)))).
 
+(* a.d. n is the size of the thread queue. *)
 Definition thread_queue_state γ (n: nat) :=
   own γ (◯ (ε, (ε, Excl' n))).
 
@@ -361,6 +421,12 @@ Global Instance rendezvous_thread_handle_persistent γtq γt th i:
   Persistent (rendezvous_thread_handle γtq γt th i).
 Proof. apply _. Qed.
 
+(* a.d. the cell_is_owned predicate for the infinite array. 
+  a fresh cell can go into two directions, depending on if suspend() or resume() reaches it first.
+
+  suspend(): cell goes to inhabited, as in a future inhabits the cell
+  resume(v): cell goes to filled, as in the cell is filled with the value v.
+*)
 Definition rendezvous_initialized γtq i: iProp :=
   inhabited_rendezvous_state γtq i ε ∨ filled_rendezvous_state γtq i ε.
 
@@ -377,29 +443,97 @@ Let cell_location γtq :=
 Let cancellation_handle := cell_cancellation_handle _ _ array_spec NArr.
 Let cell_cancelled := cell_is_cancelled _ _ array_spec NArr.
 
+(* a.d. 
+
+To describe the resources the cell owns at various states, we first need to introduce a helpful ownership
+pattern. We say that T is owned as a resource for resumer if one of the following is true:
+– The Future completion permit for f and T is owned;
+– Half the Future completion permit, the i’th permit from the dequeue iterator, and T is owned;
+– The Future completion permit for f and the i’th permit from the dequeue iterator is owned. *)
 Definition resources_for_resumer T γf γd i: iProp :=
   ((future_completion_permit γf 1%Qp ∨
     future_completion_permit γf (1/2)%Qp ∗ iterator_issued γd i) ∗ T ∨
    future_completion_permit γf 1%Qp ∗ iterator_issued γd i).
 
+(* a.d. I think this is the big cell state transition system (or at least just all the cell states, lemmas would describe which transitions are allowed.
+
+γtg : ghost cell for thread queue
+γa  : ghost cell for infinite array
+γe  : ghost cell for enqueue iterator
+γd  : ghost cell for dequeue iterator
+i   : index of the cell
+k   : state of the cell
+insideDeqFront : if i < deqFront, if so we know that dequeue registration happened.
+
+*)
 Definition cell_resources
            γtq γa γe γd i (k: option cellState) (insideDeqFront: bool):
   iProp :=
   match k with
+  (* a.d. 
+  EMPTY. By definition of a relevant cell, E was passed to it during the enqueue registration, and no state
+transitions happened yet to extract that resource, so the cell owns a E. Additionally, it is possible that the cell
+is already inside the dequeue front, in which case the cell also owns an R.
+  *)
   | None => E ∗ if insideDeqFront then R else True%I
+(* a.d.
+resume(v) arrived first. If the call to resume(v) was the first to modify the cell, we have the following:
+– The cell owns the cancellation permit for the infinite array cell, meaning that the cell is never going to
+be cancelled;
+– The cell owns the i’th permit from the dequeue iterator. *)
   | Some (cellPassedValue v d) =>
     iterator_issued γd i ∗
     cancellation_handle γa i ∗
     ⌜lit_is_unboxed v⌝ ∧
     ∃ ℓ, cell_location γtq γa i ℓ ∗
+(* a.d. There are some additional resources that the cell owns, depending on its state: *)
          match d with
+(* a.d. 
+– PENDING. The cell contains some value v, as well as both E and R. This state can only be entered when
+in the synchronous resumption mode.
+Transition from EMPTY to PENDING happens when the resumer writes its value to the cell, providing the
+i’th permit from the dequeue iterator and receiving the cell breaking token. The transition happens as
+follows: given that the i’th permit from the dequeue iterator exists, i is clearly inside the deque front,
+so initially the cell owned E and R. When the resumer first interacted with the cell, its cancellation
+handler was initialized. Therefore, we have all the resources that the cell needs to own. Additionally,
+the transition to PENDING creates the cell breaking token, which is taken by the resumer.*)
          | None => ℓ ↦ SOMEV #v ∗ E ∗ V v ∗ R
          | Some cellRendezvousSucceeded =>
+(* a.d.
+– SUCCESS-ASYNC. The cell contains some value v, owns an R and this cell’s breaking token.
+Transition from EMPTY to this state happens in the asynchronous resumption mode when the resumer
+writes its value to the cell, relinquishing the i’th permit from the dequeue iterator in exchange for E.
+The cell was inside the deque front, so it owned an R; also, the transition creates the cell breaking token,
+which is not given to the resumer but is instead kept in the cell’s ownership.
+
+TODO how does relinquishing the i'th permit from the dequeue iterator in exchange for E work? *)
            ℓ ↦ SOMEV #v ∗ cell_breaking_token γtq i ∗ V v ∗ R ∨
+(* a.d. 
+– SUCCESS. The cell contains the TAKEN marker and owns the i’th permit from the enqueue iterator, as well
+as either E or this cell’s breaking token.
+Transition from SUCCESS-ASYNC happens when suspend() writes TAKEN, having observed that the cell
+contains a value, providing its i’th permit from the enqueue iterator in exchange for R.
+Tranisition from PENDING happens under the same conditions.
+If the resumption is synchronous, the resumer can observe the state transition and give up its cell breaking
+token in exchange for E. *)
            ℓ ↦ TAKENV ∗ iterator_issued γe i ∗ (E ∨ cell_breaking_token γtq i)
+(* a.d. 
+– BROKEN. The cell contains the BROKEN marker. It also owns either the i’th permit from the enqueue
+iterator or an E. This state can only be entered when in the synchronous resumption mode.
+Transition from PENDING to BROKEN happens when the resumer stops waiting for the corresponding call
+to suspend() and writes BROKEN to the cell, using up its cell breaking permit and getting back an R in
+return. The structure of this transition is trivial.
+When suspend() observes BROKEN in the cell, it gives up the i’th permit from the enqueue iterator in
+exchange for the E, performing no state transitions in the process. *)
          | Some cellBroken => ℓ ↦ BROKENV ∗ (E ∗ CB ∨ iterator_issued γe i)
          end
   | Some (cellInhabited γf f r) =>
+(* a.d. 
+
+suspend() arrived first. If the call to suspend() was the first to modify the cell, writing a Future to it, the
+following is true:
+– The cell owns the i’th permit from the enqueue iterator.
+– There exists a unique R-passing Future f associated with the cell. *)
     iterator_issued γe i ∗ rendezvous_thread_handle γtq γf f i ∗
     ∃ ℓ, cell_location γtq γa i ℓ ∗
          match r with
@@ -486,6 +620,8 @@ Definition is_immediately_cancelled (r: option cellState): bool :=
 Definition cell_list_contents_auth_ra l (deqFront: nat): algebra :=
   ● (length l, (deqFront, MaxNat deqFront),
      (map (option_map cellState_ra) l,
+(* Finally, the size of a CQS is defined to be the number of nonskippable relevant cells outside the deque front. This is
+the value in terms of which the programmer-facing specifications are defined. *)
       Excl' (count_matching is_nonskippable (drop deqFront l)))).
 
 Lemma rendezvous_state_included γ l deqFront i s:
@@ -562,15 +698,41 @@ Proof.
   iPureIntro. eauto.
 Qed.
 
+(* Two logical values are maintained: the dequeue front, and the cell state list. The deque front is the first cell about
+which it is not yet known that its state is going to be observed by resume(v) or already was. A cell is inside the deque
+front if its index is less than the deque front. Cell state list stores the authoritative knowledge of the state of each
+relevant cell in the infinite array; a cell is considered relevant if it is known that its state is going to be observed by a
+call to suspend() or already was.
+
+The last cell inside the deque front must be a relevant cell, which effectively means that we forbid calling resume(v)
+unless it is known that the corresponding suspend() is also eventually going to be called.
+
+The deque front is nondecreasing, which is in line with its definition: once it is known that a cell is about to be
+witnessed by a call to resume(v), this can not become false. Likewise, the length of the cell state list can not decrease
+with time.
+
+a.d. l is the "cell state list" *)
 Definition thread_queue_invariant γa γtq γe γd l deqFront: iProp :=
   own γtq (cell_list_contents_auth_ra l deqFront) ∗
+(* For each relevant cell, there exists a single instance of a logical resource called the suspension permit. For each cell
+before the deque front, there exists a single instance of a logical resource called the awakening permit. *)
       ([∗ list] i ↦ e ∈ l, cell_resources γtq γa γe γd i e
                                           (bool_decide (i < deqFront))) ∗
       ⌜deqFront ≤ length l⌝ ∧
+(* It is maintained that the last cell before the deque front can not be skippable. A cell is skippable if it was “smartly”
+cancelled and onCancellation() returned true. Without this invariant, the definition of the deque front would be
+violated: if it is known that the last cell inside the deque front is skippable, it is going to be observed by a call to
+resume(v), but is going to be skipped (hence the name), and thus some of the following cells are also known to be
+observed by resume(v) at a later time, thus fitting in the deque front, which contradicts the skippable cell being the
+last such cell. *)
   ⌜deqFront > 0 ∧ (∃ r, l !! (deqFront - 1)%nat = Some r ∧ is_skippable r)
   -> False⌝.
 
+(* Physically, a CQS consists of an infinite array and two iterators, one, the enqueue iterator, bounded by the suspension
+permits, and another, the dequeue iterator, bounded by awakening permits.
+ *)
 Definition is_thread_queue γa γtq γe γd e d :=
+(* here we instantiate the cell_is_owned predicate, either it is "inhabited" or "filled". *)
   let co := rendezvous_initialized γtq in
   (inv NTq (∃ l deqFront, thread_queue_invariant γa γtq γe γd l deqFront) ∗
    is_infinite_array _ _ array_spec NArr γa co ∗
@@ -653,6 +815,8 @@ Proof.
   }
 Qed.
 
+(* a.d. Enqueue registration It is possible to provide an E, increasing the size and obtaining in exchange a suspension
+permit — a permission to call suspend(). *)
 Theorem thread_queue_append' E' γtq γa γe γd n e d:
   ↑NTq ⊆ E' ->
   is_thread_queue γa γtq γe γd e d -∗
@@ -1261,6 +1425,8 @@ Proof.
   iPureIntro. by apply advance_deqFront_pure.
 Qed.
 
+(* a.d. Dequeue registration If it is known that the size is nonzero, it is possible to decrease the size and provide an R,
+obtaining in exchange an awakening permit — a permission to call resume(v). *)
 Theorem thread_queue_register_for_dequeue' E' γtq γa γe γd n e d:
   ↑NTq ⊆ E' ->
   n > 0 ->
@@ -1314,6 +1480,11 @@ Qed.
 Global Instance is_thread_queue_persistent γa γ γe γd e d:
   Persistent (is_thread_queue γa γ γe γd e d).
 Proof. apply _. Qed.
+
+(* a.d. TODO *)
+Global Instance is_thread_queue_timeless γa γ γe γd e d:
+  Timeless (is_thread_queue γa γ γe γd e d).
+Abort.
 
 Lemma cell_cancelled_means_skippable γtq γa γe γd i b c:
   cell_cancelled γa i -∗
@@ -2679,6 +2850,21 @@ Proof.
     iExists _. by iFrame.
 Qed.
 
+(* a.d. This specifies cancellation registration, i.e. if a cell goes to CANCELLED or REFUSED 
+
+Cancellation Registration If the queue was empty, this means that every cell that is not yet cancelled is inside
+the deque front, including the one we attept to cancel currently. Thus, a transition is performed from UNDECIDED to
+REFUSED, providing an R and a cell cancelling token.
+Otherwise, the queue was not empty. A transition is performed from UNDECIDED to either SMARTLY-CANCELLED or
+PASSED, depending on whether a value was already written to the cell, providing a cancellation handle. If the cell was
+outside the deque front, this change is sufficient, as the CQS size is obviously decremented due to this cell becoming
+skippable. Otherwise, the transition additionally requires an awakening permit and provides an R. This R is then used
+to perform a deque registration. The awakening permit that is obtained in such a way is used to complete the transition.
+  
+a.d. TODO the last part is very confusing to me. cancellation registration happens inside cancellationHandler (coming from cancelling the future).
+If the cell is inside the dequeue front, then someone already did a dequeue registration to call resume, and then the cell also contains R given to the dequeue registration.
+Then we perform ANOTHER DEQUEUE REGISTRAtION? 
+But since this is about smart cancellation, we don't need to care hopefully. *)
 Theorem register_cancellation E' γa γtq γe γd e d n i:
   ↑NTq ⊆ E' ->
   is_thread_queue γa γtq γe γd e d -∗

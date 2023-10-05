@@ -41,6 +41,11 @@ Context `{heapG Σ}.
 Variable (array_interface: infiniteArrayInterface).
 Variable (aspc: infiniteArraySpec Σ array_interface).
 
+(* Each iterator introduces a logical resource that is parameterized by a nonnegative number i. We call this resource the
+i’th permit from the iterator. This permit has two important properties:
+• It is exclusive: at most one permit exists for any given iterator for any number i.
+• It implies that the iterator’s counter is at least i + 1.
+*)
 Notation algebra := (authR (prodUR (gset_disjUR nat)
                                    max_natUR)).
 
@@ -70,6 +75,7 @@ Global Instance iterator_counter_at_least_persistent γ n:
   Persistent (iterator_counter_at_least γ n).
 Proof. apply _. Qed.
 
+
 Definition iterator_contents co γa (P: iProp) γ cℓ p n: iProp :=
   (iterator_counter γ cℓ n ∗ ([∗] replicate n P) ∗
    ∃ (id: nat), (∀ id', ⌜n ≤ id' < id⌝ -∗
@@ -77,6 +83,20 @@ Definition iterator_contents co γa (P: iProp) γ cℓ p n: iProp :=
                         ∃ ℓ, infinite_array_mapsto _ _ aspc NArray co γa id' ℓ) ∗
   is_infinite_array_cutoff _ _ aspc NArray γa p id)%I.
 
+(* 
+An iterator is a pair of a segment pointer and a
+counter; for example, resumeSegm and resumeIdx form an iterator, as do suspendSegm and suspendIdx.
+
+Invariants The state of the invariant is described by the number n currently stored in its counter. Then the following
+is true:
+• The iterator stores n copies of R.
+• The segment pointer points to (in the sense of containing the reference to a segment and owning a piece of its
+pointers counter) some segment i such that all the cells in [n; i · SEGM SIZE) are cancelled. Note that it is
+possible for i · SEGM SIZE to be n or less, in which case no knowledge about cancelled cells is present.
+• There exists the i’th permit for all i ∈ [0; n). 
+
+a.d. TODO it seems normally n >= i * SEGM_SIZE because n is the cell pointer and i should be the id of the segment it is in. 
+So when can n be smaller? *)
 Definition is_iterator co γa P γ v: iProp :=
   ∃ (cℓ: loc) (p: val),
     ⌜v = (#cℓ, p)%V⌝ ∧
@@ -128,6 +148,7 @@ Proof.
   by rewrite /= union_comm_L -set_seq_plus_L.
 Qed.
 
+(* Additionally, n is nondecreasing with respect to time, that is, the iterator can only go forward. *)
 Lemma iterator_counter_at_least_implies_bound γ n m:
     iterator_counter_at_least γ n -∗
     own γ (iterator_auth_ra m) -∗
@@ -206,6 +227,10 @@ Proof.
   iApply "HΦ". iExists _, _. by iFrame "HInv".
 Qed.
 
+(* The step() operation acquires an instance of an R and returns one of two possible results:
+• A pair of true and a cell c with index i. In this case, the i’th permit from this iterator is provided.
+• A pair of false and a cell c with index j. In this case, the i’th permit from this iterator is provided for some
+i < j, and all the cells in [i; j) are known to be cancelled. *)
 Theorem iteratorStep_spec co γa P γ (v: val):
   {{{ is_infinite_array _ _ aspc NArray γa co ∗ is_iterator co γa P γ v ∗ P }}}
     iteratorStep array_interface v
@@ -216,6 +241,26 @@ Theorem iteratorStep_spec co γa P γ (v: val):
                ∃ ℓ, infinite_array_mapsto _ _ aspc NArray co γa i ℓ
   }}}.
 Proof.
+(* Proof of the Step Operation. (see file https://github.com/Kotlin/kotlinx.coroutines/tree/cqs-proofs/
+theories/lib/concurrent linked list/infinite array/iterator/iterator impl.v) First, the segment
+pointer is read. The counter contained some number n at the moment, and, according to the invariant, the segment
+pointer contained a reference to some segment r such that all cells in [n; r.id · SEGM SIZE) are cancelled.
+Next, the counter is incremented. If at that moment it contained i, then the i’th permit from the iterator is created; it is
+also known that i ≥ n, due to monotonicity of the iterator.
+Then findAndMoveForward(r, i/SEGM SIZE) is executed. According to its specification, it returns some segment s
+such that s.id ≥ r.id, s.id ≥ i/SEGM SIZE, and all the segments in [max(r.id, i/SEGM SIZE); s.id) are cancelled.
+If s.id is i/SEGM SIZE, then true is returned, and the cell is formed correctly, obeying the provided specification.
+Otherwise, false is returned, along with a cell with index s.id · SEGM SIZE. The specification of step() requires
+that we show then that i < s.id · SEGM SIZE (which easily follows from i/SEGM SIZE < s.id) and that all cells in
+[i; s.id · SEGM SIZE) are cancelled, which requires further elaboration.
+We consider two possibilities in order to prove it.
+• i/SEGM SIZE ≥ r.id. Then we know from the information provided by findAndMoveForward(..) that
+all the segments in [i/SEGM SIZE; s.id) are logically removed, which means that all the cell in [i; s.id ·
+SEGM SIZE) are cancelled, which is what we needed to prove.
+• r.id > i/SEGM SIZE. Then findAndMoveForward(..) guarantees that segments in [r.id; s.id) are logically
+removed, so cells in [r.id · SEGM SIZE; s.id · SEGM SIZE) are cancelled. It is also known that all cells in
+[n; r.id · SEGM SIZE) are cancelled and that n ≤ i; thus, all cells in [i; r.id · SEGM SIZE) are cancelled. By
+combining the two intervals, we obtain the desired proposition. *)
   iIntros (Φ) "(#HArr & #HIter & HP) HΦ".
   iDestruct "HIter" as (cℓ p) "[% HInv]". simplify_eq.
   wp_lam. wp_pures. wp_bind (cutoffGetPointer _ _).
@@ -374,6 +419,9 @@ Proof.
       iIntros "!> HΦ". wp_pures. iApply "HΦ". iLeft. by iFrame.
 Qed.
 
+(* Last, a logical operation of accessing the bounding resource is available. This operation allows the caller to observe
+that there are at least i + 1 copies of R stored in the iterator if there exists the i’th permit. The correctness of this
+operation follows directly from the invariants that follow. *)
 Lemma access_iterator_resources E R co γa γd d i:
   ↑N ⊆ E ->
   is_iterator co γa R γd d -∗

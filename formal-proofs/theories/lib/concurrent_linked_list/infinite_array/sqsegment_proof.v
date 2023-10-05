@@ -464,7 +464,7 @@ Canonical Structure node_segment `{!heapG Σ}
   segment_spec.getCleanedAndPointersLoc_spec :=
     getCleanedAndPointersLoc_spec segment_size pointer_shift N;
   segment_spec.newSegment_spec :=
-    newSegment_spec segment_size pointer_shift N;
+    newSegment_spec segment_size pointer_shift limit N;
   segment_spec.max_slots_bound :=
     max_slots_bound segment_size pointer_shift limit;
   segment_spec.node_induces_id :=

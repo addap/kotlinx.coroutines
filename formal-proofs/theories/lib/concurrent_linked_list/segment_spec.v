@@ -1,6 +1,7 @@
 From SegmentQueue.lib.concurrent_linked_list Require Export segment_interfaces.
 From iris.heap_lang Require Export proofmode notation lang.
 
+(* an extra way to associate some value to a ghost name. *)
 Record uniqueValue {Σ} {name value: Type} :=
   UniqueValue {
       has_value (γ: name) (value: value): iProp Σ;
