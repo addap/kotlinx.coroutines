@@ -85,7 +85,7 @@ Proof.
 Qed.
 
 Definition is_callback (P: val -> iProp Σ) (γk: gname) (k: val): iProp Σ :=
-  (⌜k ≠ #()⌝ ∗ (callback_invokation_permit γk 1%Qp -∗ ∀ v, P v -∗ WP (k v) {{_, True}})).
+  (⌜k ≠ #()⌝ ∗ (callback_invokation_permit γk 1%Qp -∗ ∀ v, P v -∗ WP (k v) {{v, ⌜ v = #() ⌝}})).
 
 (* Global Instance is_callback_persistent R γ k:
   Persistent (is_callback R γ k).
@@ -123,69 +123,32 @@ Qed.
 Proof.
   iIntros "#HFuture". 
   iInv "HFuture" as (p) "[>H● Hℓ]" "HInvClose". *)
+  
+Theorem invokeCallback_spec' P γ k (v: val):
+  is_callback P γ k -∗
+  P v -∗
+  callback_invokation_permit γ 1%Qp -∗
+    WP (k v) {{v, ⌜ v = #() ⌝ }}.
+Proof.
+  iIntros "(% & HCallback) HP HInvoke".
+  rewrite /is_callback.
+  iApply ("HCallback" with "[HInvoke] [HP]").
+  iAssumption. iAssumption.
+Qed.
 
 Theorem invokeCallback_spec P γ k (v: val):
   {{{ is_callback P γ k ∗
-      ▷ P v ∗
+      P v ∗
       callback_invokation_permit γ 1%Qp }}}
     k v
-  {{{ r, RET #r; callback_is_invoked γ v }}}.
+  {{{ RET #(); True }}}.
 Proof.
+  (* a.d. TODO how do these TEXAN triples work and why do I get a later that I cannot get rid of. *)
 Admitted.
-  (* iIntros (Φ) "((% & HIHCallback) & HP & HInvoke) HΦ".
-  rewrite /is_callback.
-  iApply "HCallback".
-
-
-
-  iIntros "#HFuture" (Φ) "AU". 
-  iInv "HFuture" as (p) "[>H● Hℓ]" "HInvClose".
-  iMod "AU" as "[[HR HPermit] [_ HClose]]".
-  destruct p.
-  - wp_cmpxchg_suc.
-    iMod (own_update_2 with "H● HPermit") as "[H● HCallbackInvoked]".
-    {
-      apply auth_update with
-          (a' := (Some (to_agree (Some v)),
-                  permit_auth_ra false, permit_auth_ra true)).
-      repeat apply prod_local_update'.
-      - by apply alloc_option_local_update.
-      - rewrite /permit_auth_ra.
-        etransitivity.
-        by apply delete_option_local_update, Cinl_exclusive, frac_full_exclusive.
-        by apply alloc_option_local_update.
-      - done.
-    }
-    iDestruct "HCallbackInvoked" as "#HCallbackInvoked".
-    iMod ("HClose" $! true with "HCallbackInvoked") as "HΦ".
-    iModIntro.
-    iMod ("HInvClose" with "[-HΦ]") as "_".
-    { iExists (CallbackInvoked v). iFrame.
-      iDestruct "HR" as "[$|HContra]".
-      destruct controlling_cancellation.
-      - iDestruct (callback_is_invoked_not_cancelled
-                     with "HCallbackInvoked HContra") as ">[]".
-      - iDestruct "HContra" as %[].
-    }
-    iModIntro. by wp_pures.
-  - iDestruct (own_valid_2 with "H● HPermit")
-      as %[[[_ HValid]%pair_included _]%pair_included _]%auth_both_valid.
-    exfalso. move: HValid. rewrite /permit_auth_ra.
-    rewrite Some_included. case=> HContra.
-    * inversion HContra.
-    * apply csum_included in HContra.
-      destruct HContra as
-          [HContra|[(? & ? & ? & HContra & ?)|(? & ? & HContra & ?)]];
-        simplify_eq.
-  - wp_cmpxchg_fail.
-    iMod (future_is_cancelled_from_auth_ra with "H●") as "[H● HFutureCancelled]".
-    destruct controlling_cancellation.
-    2: iDestruct "HR" as "[HR|%]"; last done.
-    all: iMod ("HClose" $! false with "[$]") as "HΦ"; iModIntro.
-    all: iMod ("HInvClose" with "[H● Hℓ]") as "_";
-      first by iExists FutureCancelled; iFrame.
-    all: iModIntro; by wp_pures.
-Qed. *)
+  (* iIntros (Φ) "((% & HCallback) & HP & HInvoke) HΦ".
+  iSpecialize ("HCallback" with "HInvoke HP").
+  iApply (wp_strong_mono with "HCallback"); try done.
+  iIntros (? ->) "!>". *)
 
 End proof.
 
