@@ -29,7 +29,7 @@ Definition callbackΣ : gFunctors := #[GFunctor algebra].
 Instance subG_callbackΣ {Σ} : subG callbackΣ Σ -> callbackG Σ.
 Proof. solve_inG. Qed.
 
-Context `{heapG Σ} `{callbackG Σ} (N: namespace).
+Context `{heapG Σ} `{callbackG Σ}.
 
 (* true -> whole permit
    false -> not present *)
