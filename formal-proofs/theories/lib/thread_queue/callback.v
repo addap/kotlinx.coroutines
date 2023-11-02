@@ -1,5 +1,6 @@
 From iris.heap_lang Require Import notation lang.
-From SegmentQueue.util Require Import cmra.
+From SegmentQueue.util Require Import
+  everything local_updates big_opL cmra count_matching find_index.
 
 From iris.base_logic Require Import lib.invariants.
 From iris.program_logic Require Import atomic.
@@ -11,7 +12,8 @@ Section proof.
 
 Inductive callback_state :=
   | CallbackWaiting
-  | CallbackInvoked (v: val).
+  | CallbackInvoked (v: val)
+  | CallbackCancelled.
 
 Notation permit := (optionUR (csumR fracR (agreeR unitO))).
 
@@ -19,8 +21,10 @@ Notation algebra := (authUR (prodUR
                                   (* None: Waiting
                                      Some: Invoked
                                   *)
-                                  (optionUR (agreeR valO))
-                                  permit)).
+                              (prodUR
+                                (optionUR (agreeR (optionO valO)))
+                                permit)
+                              permit)).
 
 Class callbackG Σ := CallbackG {
   callback_inG :> inG Σ algebra;
@@ -43,18 +47,29 @@ Definition permit_state_ra (present: bool): permit :=
 
 Definition callback_auth_ra (p: leibnizO callback_state): algebra :=
   ● match p with
-  | CallbackWaiting => (None, permit_auth_ra true)
-  | CallbackInvoked v => (Some (to_agree v), permit_auth_ra false)
+  | CallbackWaiting => (None, permit_auth_ra true, permit_auth_ra true)
+  | CallbackInvoked v => (Some (to_agree (Some v)), permit_auth_ra false, permit_auth_ra true)
+  | CallbackCancelled => (Some (to_agree None), permit_auth_ra true, permit_auth_ra false)
   end.
-
+    
 Definition callback_invokation_permit (γ: gname) (q: Qp): iProp Σ :=
-  own γ (◯ (None, Some (Cinl q))).
+  own γ (◯ (None, Some (Cinl q), None)).
+
+Definition callback_cancellation_permit (γ: gname) (q: Qp): iProp Σ :=
+  own γ (◯ (None, None, Some (Cinl q))).
 
 Definition callback_is_invoked (γ: gname) (v: val): iProp Σ :=
-  own γ (◯ (Some (to_agree v), permit_state_ra false)).
+  own γ (◯ (Some (to_agree (Some v)), permit_state_ra false, None)).
+  
+Definition callback_is_cancelled (γ: gname): iProp Σ :=
+  own γ (◯ (Some (to_agree None), None, permit_state_ra false)).
 
 Global Instance callback_invokation_permit_Timeless:
   Timeless (callback_invokation_permit γ q).
+Proof. apply _. Qed.
+
+Global Instance callback_cancellation_permit_Timeless:
+  Timeless (callback_cancellation_permit γ q).
 Proof. apply _. Qed.
 
 Global Instance callback_invokation_permit_Fractional γ:
@@ -64,8 +79,23 @@ Proof.
   by rewrite -own_op -auth_frag_op -!pair_op -Some_op -Cinl_op -frac_op'.
 Qed.
 
+Global Instance callback_cancellation_permit_Fractional γ:
+  Fractional (callback_cancellation_permit γ).
+Proof.
+  iIntros (x y). rewrite /callback_cancellation_permit.
+  by rewrite -own_op -auth_frag_op -!pair_op -Some_op -Cinl_op -frac_op'.
+Qed.
+
 Theorem callback_invokation_permit_valid γ q:
   callback_invokation_permit γ q -∗ ⌜(q ≤ 1)%Qc⌝.
+Proof.
+  iIntros "HFuture". iDestruct (own_valid with "HFuture") as %HValid.
+  iPureIntro. move: HValid. rewrite auth_frag_valid; case; case=> /=. 
+  rewrite Some_valid. by compute.
+Qed.
+
+Theorem callback_cancellation_permit_valid γ q:
+  callback_cancellation_permit γ q -∗ ⌜(q ≤ 1)%Qc⌝.
 Proof.
   iIntros "HFuture". iDestruct (own_valid with "HFuture") as %HValid.
   iPureIntro. move: HValid. rewrite auth_frag_valid. case=> _/=. 
@@ -76,21 +106,47 @@ Global Instance callback_is_invoked_Persistent:
   Persistent (callback_is_invoked γ v).
 Proof. apply _. Qed.
 
+Global Instance callback_is_cancelled_Persistent:
+  Persistent (callback_is_cancelled γ).
+Proof. apply _. Qed.
+
 Theorem callback_invokation_permit_implies_not_invoked γ v q:
   callback_invokation_permit γ q -∗ callback_is_invoked γ v -∗ False.
+Proof.
+  iIntros "H1 H2".
+  iDestruct (own_valid_2 with "H1 H2") as %[[_ HValid]%pair_valid _]%pair_valid.
+  exfalso. move: HValid=> /=. by compute.
+Qed.
+
+Theorem callback_cancellation_permit_implies_not_cancelled γ q:
+  callback_cancellation_permit γ q -∗ callback_is_cancelled γ -∗ False.
 Proof.
   iIntros "H1 H2".
   iDestruct (own_valid_2 with "H1 H2") as %[_ HValid]%pair_valid.
   exfalso. move: HValid=> /=. by compute.
 Qed.
 
-Definition is_callback (P: val -> iProp Σ) (γk: gname) (k: val): iProp Σ :=
-  (⌜k ≠ #()⌝ ∗ (callback_invokation_permit γk 1%Qp -∗ ∀ v, P v -∗ WP (k v) {{v, ⌜ v = #() ⌝}})).
+Theorem callback_is_invoked_not_cancelled γ v:
+  callback_is_invoked γ v -∗ callback_is_cancelled γ -∗ False.
+Proof.
+  iIntros "H1 H2".
+  iDestruct (own_valid_2 with "H1 H2")
+    as %[[HValid _]%pair_valid _]%pair_valid.
+  exfalso. move: HValid=> /=. rewrite -Some_op Some_valid=> HValid.
+  by apply agree_op_invL' in HValid.
+Qed.
 
-(* Global Instance is_callback_persistent R γ k:
-  Persistent (is_callback R γ k).
-Proof. apply _. Qed. *)
+Definition is_waker (P: val -> iProp Σ) (k : val): iProp Σ := ∀ v, P v -∗ WP (k v) {{r, ⌜ r = #() ⌝}}.
 
+Definition callback_invariant (P: val -> iProp Σ) (γ: gname) (k: val)
+           (state: callback_state): iProp Σ :=
+  own γ (callback_auth_ra state) ∗ ⌜ k ≠ #() ⌝ ∗
+  match state with
+    | CallbackWaiting => is_waker P k
+    | CallbackInvoked v => True
+    | CallbackCancelled =>  True
+  end.
+    
 Instance callback_state_Inhabited: Inhabited callback_state.
 Proof. econstructor. econstructor. Qed.
 
@@ -101,10 +157,31 @@ Proof.
   iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
   apply auth_update_core_id; first by apply _.
   repeat (apply prod_included; split). all: simpl. all: try done.
+  apply None_least.
+Qed.
+
+Lemma callback_is_cancelled_from_auth_ra γ:
+  own γ (callback_auth_ra CallbackCancelled) ==∗
+  own γ (callback_auth_ra CallbackCancelled) ∗ callback_is_cancelled γ.
+Proof.
+  iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
+  apply auth_update_core_id; first by apply _.
+  repeat (apply prod_included; split). all: simpl. all: try done.
+  apply None_least.
 Qed.
 
 Theorem callback_invokation_permit_exclusive γ q:
   callback_invokation_permit γ 1%Qp -∗ callback_invokation_permit γ q -∗ False.
+Proof.
+  iIntros "H1 H2". iCombine "H1" "H2" as "H".
+  iDestruct (own_valid with "H") as %HValid. exfalso. move: HValid.
+  case; case=> _/=.
+  move: (frac_valid' (1 + q)). case=> HOk _ HOk' _. apply HOk in HOk'.
+  by eapply Qp_not_plus_q_ge_1.
+Qed.
+
+Theorem callback_cancellation_permit_exclusive γ q:
+  callback_cancellation_permit γ 1%Qp -∗ callback_cancellation_permit γ q -∗ False.
 Proof.
   iIntros "H1 H2". iCombine "H1" "H2" as "H".
   iDestruct (own_valid with "H") as %HValid. exfalso. move: HValid.
@@ -113,44 +190,88 @@ Proof.
   by eapply Qp_not_plus_q_ge_1.
 Qed.
 
-
-(* Theorem invokeCallback_spec P γ k (v: val):
-  is_callback P γ k -∗
-  {{{ ▷ P v ∗
-      callback_invokation_permit γ 1%Qp }}}
-    k v @ ⊤ ∖ ↑N
-  {{{ RET #(); callback_is_invoked γ v }}}.
-Proof.
-  iIntros "#HFuture". 
-  iInv "HFuture" as (p) "[>H● Hℓ]" "HInvClose". *)
-  
-Theorem invokeCallback_spec' P γ k (v: val):
-  is_callback P γ k -∗
-  P v -∗
+Theorem invokeCallback_spec P γ k (v: val):
   callback_invokation_permit γ 1%Qp -∗
-    WP (k v) {{v, ⌜ v = #() ⌝ }}.
+  callback_invariant P γ k CallbackWaiting -∗
+  P v ==∗
+    WP (k v) {{r, ⌜ r = #() ⌝ }} ∗
+    callback_invariant P γ k (CallbackInvoked v) ∗
+    callback_is_invoked γ v.
 Proof.
-  iIntros "(% & HCallback) HP HInvoke".
-  rewrite /is_callback.
-  iApply ("HCallback" with "[HInvoke] [HP]").
-  iAssumption. iAssumption.
+  iIntros "HInvoke (H● & % & Hk) HP".
+  iSplitL "Hk HP". 
+  - iModIntro.  
+    iApply ("Hk" with "HP").
+  - iAssert (|==> own γ (callback_auth_ra (CallbackInvoked v)) ∗ callback_is_invoked γ v)%I with "[H● HInvoke]" as ">[H● HCallbackInvoked]".
+    { 
+      iApply own_op.
+      iApply (own_update_2 with "H● HInvoke").
+      rewrite /callback_auth_ra. 
+      apply auth_update with
+          (a' := (Some (to_agree (Some v)),
+                  permit_auth_ra false, permit_auth_ra true)).
+      repeat apply prod_local_update'.
+      - by apply alloc_option_local_update.
+      - rewrite /permit_auth_ra.
+        etransitivity.
+        by apply delete_option_local_update, Cinl_exclusive, frac_full_exclusive.
+        by apply alloc_option_local_update.
+      - done.
+    }
+    iModIntro.
+    iFrame. by iSplit.
 Qed.
 
-Theorem invokeCallback_spec P γ k (v: val):
-  {{{ is_callback P γ k ∗
-      P v ∗
-      callback_invokation_permit γ 1%Qp }}}
-    k v
-  {{{ RET #(); True }}}.
+Theorem cancelCallback_spec P γ k (v: val):
+  callback_cancellation_permit γ 1%Qp -∗
+  callback_invariant P γ k CallbackWaiting ==∗
+    is_waker P k ∗
+    callback_invariant P γ k CallbackCancelled ∗
+    callback_is_cancelled γ.
 Proof.
-  (* a.d. TODO how do these TEXAN triples work and why do I get a later that I cannot get rid of. *)
-Admitted.
-  (* iIntros (Φ) "((% & HCallback) & HP & HInvoke) HΦ".
-  iSpecialize ("HCallback" with "HInvoke HP").
-  iApply (wp_strong_mono with "HCallback"); try done.
-  iIntros (? ->) "!>". *)
+  iIntros "HCancel (H● & % & Hk)".
+  iSplitL "Hk"; first done.
+  iAssert (|==> own γ (callback_auth_ra CallbackCancelled) ∗ callback_is_cancelled γ)%I with "[H● HCancel]" as ">[H● HCallbackCancelled]".
+  { 
+    iApply own_op.
+    iApply (own_update_2 with "H● HCancel").
+    rewrite /callback_auth_ra. 
+    apply auth_update with
+        (a' := (Some (to_agree None),
+                permit_auth_ra true, permit_auth_ra false)).
+    repeat apply prod_local_update'.
+    - by apply alloc_option_local_update.
+    - done.
+    - rewrite /permit_auth_ra.
+      etransitivity.
+      by apply delete_option_local_update, Cinl_exclusive, frac_full_exclusive.
+      by apply alloc_option_local_update.
+  }
+  iModIntro.
+  iFrame. by iSplit.
+Qed.
+
+Theorem newCallback_spec P k:
+  ⌜ k ≠ #() ⌝ -∗  
+  is_waker P k ==∗
+    ∃ γ, callback_invariant P γ k CallbackWaiting ∗
+          callback_invokation_permit γ 1%Qp ∗ 
+          callback_cancellation_permit γ 1%Qp.
+Proof.
+  iIntros "Hunit Hwaker".
+  iMod (own_alloc (callback_auth_ra CallbackWaiting ⋅
+                   (◯ (None, Some (Cinl 1%Qp), None) ⋅
+                    ◯ (None, None, Some (Cinl 1%Qp)))))
+    as (γ) "[H● [H◯ H◯']]".
+  {
+    apply auth_both_valid. split; last done.
+    repeat (apply prod_included'; split). all: by simpl.
+  }
+  iModIntro.
+  iExists _. by iFrame.
+Qed.
 
 End proof.
 
-Typeclasses Opaque callback_invokation_permit 
-            callback_is_invoked is_callback.
+Typeclasses Opaque callback_invokation_permit callback_cancellation_permit 
+            callback_is_invoked callback_is_cancelled.

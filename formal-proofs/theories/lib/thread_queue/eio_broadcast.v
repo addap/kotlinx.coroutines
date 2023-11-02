@@ -160,6 +160,7 @@ Let NDeq := N .@ "deq".
 Let NEnq := N .@ "enq".
 Notation iProp := (iProp Σ).
 
+(* a.d. TODO can we make R persistent here? *)
 Record thread_queue_parameters :=
   ThreadQueueParameters
     {
@@ -359,7 +360,7 @@ following is true:
                   E ∗ (if insideDeqFront then R else True) ∗
                   (* a.d. I decided to just put the is_callback in here. resume() would take this and do a state transition.
                      it needs the R from above to use the WP inside. *)
-                  is_callback V' γk k ∗
+                  callback_invariant V' γk k CallbackWaiting ∗
                   (callback_invokation_permit γk 1%Qp ∨
                    callback_invokation_permit γk (1/2)%Qp ∗
                    iterator_issued γd i)
@@ -368,12 +369,14 @@ following is true:
            (* a.d. TODO why have the disjunction? I think I should only have EIORESUMEDV *)
            (ℓ ↦ InjLV k ∨ ℓ ↦ EIORESUMEDV) ∗
            iterator_issued γd i ∗
-           cancellation_handle γa i
+           cancellation_handle γa i ∗
+           callback_invariant V' γk k (CallbackInvoked #())
          (* CALLBACK SIMPLY CANCELLED *)
          | Some cellImmediatelyCancelled =>
            (* a.d. TODO why have the disjunction? I think I should only have CANCELLEDV *)
            (ℓ ↦ InjLV k ∨ ℓ ↦ CANCELLEDV) ∗
            (* future_is_cancelled γf ∗ *)
+           callback_invariant V' γk k CallbackCancelled ∗
            (* resources_for_resumer (if insideDeqFront then R else True) γk γd i *)
            (* a.d. since I have a simpler state transition system it could work that I just have the resource here. *)
            (resources_for_resumer (if insideDeqFront then R else True) γk γd i)
@@ -887,7 +890,7 @@ Proof.
     destruct v as [[|? ? [[|]|]]|]=>//.
     + iDestruct "H" as "($ & $ & H)". iDestruct "H" as (?) "H".
       iExists _. 
-      iDestruct "H" as "($ & $ & H)".
+      iDestruct "H" as "($ & $ & $ & H)".
       iDestruct "H" as "[[H _]|H]"; [iLeft|iRight]; iFrame; done.
     + iDestruct "H" as "($ & $ & H)".
       iDestruct "H" as (?) "H".
@@ -1015,7 +1018,7 @@ Proof.
     iDestruct ("HContra" with "HCancHandle") as %[]. }
   iDestruct "HRR" as "(_ & _ & HRR)". iDestruct "HRR" as (ℓ) "[_ HRR]".
   destruct c' as [[|]|].
-  - iDestruct "HRR" as "(_ & _ & HCancHandle)".
+  - iDestruct "HRR" as "(_ & _ & HCancHandle & _)".
     iDestruct ("HContra" with "HCancHandle") as %[].
   - iPureIntro. done.
   - iDestruct "HRR" as "(_ & HCancHandle & _)".
@@ -1084,15 +1087,14 @@ Proof.
   by iMod ("HHRestore" with "HH").
 Qed.
 
-Lemma callback_is_not_unit γk k:
-  is_callback V' γk k -∗ ⌜k ≠ #()⌝ ∗ is_callback V' γk k.
+Lemma callback_is_not_unit γk k state:
+  callback_invariant V' γk k state -∗ ⌜k ≠ #()⌝ ∗ callback_invariant V' γk k state.
 Proof.
-  rewrite /is_callback.
-  iIntros "[% H]". by iFrame.
+  iIntros "(H1 & % & H2)". by iFrame.
 Qed.
 
 Lemma inhabit_cell_spec γa γtq γe γd γk i ptr k e d:
-  {{{ is_callback V' γk k ∗
+  {{{ callback_invariant V' γk k CallbackWaiting ∗
       cell_location γtq γa i ptr ∗
       is_thread_queue γa γtq γe γd e d ∗
       callback_invokation_permit γk 1%Qp ∗
@@ -1103,7 +1105,7 @@ Lemma inhabit_cell_spec γa γtq γe γd γk i ptr k e d:
       then rendezvous_thread_handle γtq γk k i
       else filled_rendezvous_state γtq i ε
            ∗ iterator_issued γe i
-           ∗ is_callback V' γk k
+           ∗ callback_invariant V' γk k CallbackWaiting
            ∗ callback_invokation_permit γk 1%Qp }}}.
 Proof.
   iIntros (Φ) "(HF & #H↦ & #(HInv & HInfArr & HE & _) & HInvoke & HEnq)
@@ -1380,7 +1382,7 @@ Proof.
   - (* Cell could not have been resumed already. *)
     iDestruct "HRR" as "(_ & >HContra & _)".
     iDestruct (iterator_issued_exclusive with "HContra HIsRes") as %[].
-  - iDestruct "HRR" as "[Hℓ [HCompletion|[_ HC]]]".
+  - iDestruct "HRR" as "(Hℓ & HCallback & [HCompletion|[_ HC]])".
     iDestruct "HCompletion" as "[[HCompletionPermit|[_ HC]] HR]".
     all: try by iDestruct (iterator_issued_exclusive with "HIsRes HC") as ">[]".
     iDestruct "Hℓ" as "[Hℓ|Hℓ]"; wp_load.
@@ -1399,7 +1401,7 @@ Proof.
       iFrame "HIsSus HTh". iExists _.
       (* a.d. TODO here I need resources for resumer. *)
       iFrame "H↦".
-      iSplitL "Hℓ"; first by iRight. iRight. iFrame.
+      iSplitL "Hℓ"; first by iRight. iFrame.
   - iDestruct "HRR" as "(Hℓ & HCancHandle & HE & HR & HCallback &
       [HInvoke|[_ HC]])".
     2: by iDestruct (iterator_issued_exclusive with "HIsRes HC") as ">[]".
@@ -1438,7 +1440,7 @@ Proof.
   rewrite bool_decide_true; last lia.
   simpl. iDestruct "HRR" as "(HIsSus & HTh & HRR)".
   iDestruct "HRR" as (ℓ') "(H↦' & Hℓ & HRR)".
-  iDestruct "HRR" as "[[[HFuture|[_ >HC]] HR]|[_ >HC]]".
+  iDestruct "HRR" as "(HCallback & [[[HFuture|[_ >HC]] HR]|[_ >HC]])".
   all: try by iDestruct (iterator_issued_exclusive with "HC HIsRes") as %[].
   iFrame "HR".
   iMod ("HClose" with "[-]"); last done. iExists _, _. iFrame "H● HRest".
@@ -1520,7 +1522,8 @@ Proof.
 Qed. 
 
 (* a.d. TODO it feels kinda weird to use the alter lemma here since they don't use it in other places.
-   The question is then how do they update the logical state? *)
+   The question is then how do they update the logical state? 
+   DONE they use big_sepL_insert_acc *)
 Lemma read_cell_value_by_suspender_spec γtq γa γe γd i (ptr: loc):
   (* this should imply that the value is not yet taken *)
   rendezvous_filled_value γtq #() i -∗
@@ -2195,20 +2198,24 @@ Proof. apply _. Qed.
 (* Definition thread_queue_future_cancellation_permit γf :=
   future_cancellation_permit γf (1/2)%Qp. *)
 
-Theorem suspend_spec γa γtq γe γd γk e d k:
+Theorem suspend_spec γa γtq γe γd e d k:
   {{{ is_thread_queue γa γtq γe γd e d ∗ 
       suspension_permit γtq ∗ 
-      ▷ is_callback V' γk k ∗ 
-      callback_invokation_permit γk 1%Qp }}}
+      is_waker V' k ∗
+      ⌜ k ≠ #() ⌝ }}}
     suspend array_interface e k
   {{{ v, RET v; ⌜v = NONEV⌝ ∨
-                ∃ γk v', ⌜v = SOMEV v'⌝ ∧
+                ∃ γk v', ⌜v = SOMEV v'⌝ ∗
+                         callback_cancellation_permit γk 1%Qp ∧
                          is_thread_queue_suspend_result γtq γa γk v' 
                          (* a.d. TODO we need to have an analogue of the cancellation permit. *)
                          (* thread_queue_future_cancellation_permit γf *) }}}.
 Proof.
-  iIntros (Φ) "(#HTq & HIsSus & HCallback & HInvoke) HΦ". wp_lam.
-  wp_pures.
+  iIntros (Φ) "(#HTq & HIsSus & Hk & Hunit) HΦ".
+  iApply fupd_wp.
+  iMod (newCallback_spec with "Hunit Hk") as (γk) "(HCallback & HInvoke & HCancel)".
+  iModIntro.
+  wp_lam. wp_pures.
   wp_bind (iteratorStep _ _). iApply (iteratorStep_spec with "[HIsSus]").
   2: { by iDestruct "HTq" as "(_ & $ & $ & _)". }
   by solve_ndisj.
@@ -2239,6 +2246,7 @@ Proof.
   destruct inhabitResult.
   { (* the cell was successfully inhabited. *)
     wp_pures. iApply "HΦ". iRight. iExists _, _. iSplitR; first done.
+    iFrame.
     rewrite /rendezvous_thread_handle /is_thread_queue_suspend_result /rendezvous_thread_handle.
     iExists _, _, _.
     iSplit; first done.
@@ -2248,11 +2256,11 @@ Proof.
      we know it can only be due to a value, so we call the callback ourselves *)
   wp_pures. wp_bind (!_)%E.
   iDestruct "HResult" as "(#HFilled & HIsSus & HCallback & HInvoke)".
-  iAssert (▷ is_callback V' γk k)%I with "HCallback" as "HCallback".
+  iAssert (▷ callback_invariant V' γk k CallbackWaiting)%I with "HCallback" as "HCallback".
   awp_apply (read_cell_value_by_suspender_spec with "HFilled H↦ HIsSus")
     without "HΦ".
   iDestruct "HTq" as "(HInv & HRest)". iInv "HInv" as (l deqFront) "HOpen".
-  iAaccIntro with "HOpen". iIntros "HOpen !>"; iSplitR "HCallback HInvoke"; first iExists _, _. 
+  iAaccIntro with "HOpen". iIntros "HOpen !>"; iSplitR "HCallback HInvoke HCancel"; first iExists _, _. 
     by done. 
     by iFrame.
   iIntros (? ?) "(HTq & -> & HEl & -> & HRR)". 
@@ -2261,15 +2269,43 @@ Proof.
   (* rendezvous succeeded, we may safely leave. *)
   wp_pures.
   wp_bind (k #()).
-  iApply (wp_strong_mono with "[HCallback HInvoke HRR]"); try by done.
-  iApply (invokeCallback_spec' with "[$] [HRR] [$]").
-  rewrite /V'. by iFrame.
+  (* change the logical state of the callback. *)
+  iApply fupd_wp.
+  iMod (invokeCallback_spec with "HInvoke HCallback [HRR]") as "(Hk & HCallback & HCallbackInvoked)".
+  { rewrite /V'. by iFrame. }
+  iModIntro.
+  iApply (wp_strong_mono with "Hk"); [by done|by done|].
   iIntros (? ->).
   iModIntro.
   wp_pures.
   iApply "HΦ".
   by iLeft. 
 Qed.
+
+Theorem try_cancel_spec γa γtq γe γd e d γk r:
+  {{{ is_thread_queue γa γtq γe γd e d ∗ 
+      callback_cancellation_permit γk 1%Qp ∗
+      is_thread_queue_suspend_result γtq γa γk r }}}
+    try_cancel array_interface r
+  {{{ b, RET #b; if b then ∃ is_waker 
+
+  {{{ }}}
+  is_thread_queue γa γtq γe γd e d -∗
+  is_thread_queue_suspend_result γtq γa γk r -∗
+  <<< (* ▷ thread_queue_future_cancellation_permit γf *) True >>>
+    try_cancel r @ ⊤ ∖ ↑NTq
+  <<< ∃ (r: bool),
+      if r then 
+        ∃ i k, 
+        is_infinite_array_cell_pointer _ _ array_spec NArr γa e i
+        ∗ rendezvous_thread_handle γtq γk k i ∗
+        inhabited_rendezvous_state γtq i (Some (Cinr (Cinl (to_agree ()))))
+             ∗ ▷ cancellation_handle γa i
+      else
+        True,
+        (* thread_queue_future_cancellation_permit γf, *)
+      RET #r >>>.
+Proof.
 
 Theorem try_cancel_spec γa γtq γe γd e d γk r:
   is_thread_queue γa γtq γe γd e d -∗
