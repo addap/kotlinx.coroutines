@@ -145,7 +145,8 @@ Definition is_waker (P: val -> iProp Σ) (k : val): iProp Σ := ∀ v, P v -∗ 
 
 Definition callback_invariant (P: val -> iProp Σ) (γ: gname) (k: val)
            (state: callback_state): iProp Σ :=
-  own γ (callback_auth_ra state k) ∗ ⌜ k ≠ #() ⌝ ∗
+  own γ (callback_auth_ra state k) ∗ 
+  (⌜ k ≠ #() ⌝ ∗ ⌜ k ≠ #1 ⌝ ∗ ⌜ val_is_unboxed (InjLV k) ⌝) ∗
   match state with
     | CallbackWaiting => is_waker P k
     | CallbackInvoked v => True
@@ -166,8 +167,8 @@ Proof.
   apply None_least.
 Qed.
 
-Lemma callback_is_cancelled_from_auth_ra γ k:
-  own γ (callback_auth_ra CallbackCancelled k) ==∗
+Lemma callback_is_cancelled_from_auth_ra γ k E:
+  own γ (callback_auth_ra CallbackCancelled k) ={E}=∗
   own γ (callback_auth_ra CallbackCancelled k) ∗ callback_is_cancelled γ.
 Proof.
   iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
@@ -252,9 +253,9 @@ Proof.
     iFrame. by iSplit.
 Qed.
 
-Theorem cancelCallback_spec P γ k (v: val):
+Theorem cancelCallback_spec P γ k E:
   callback_cancellation_permit γ 1%Qp -∗
-  callback_invariant P γ k CallbackWaiting ==∗
+  callback_invariant P γ k CallbackWaiting ={E}=∗
     is_waker P k ∗
     callback_invariant P γ k CallbackCancelled ∗
     callback_is_cancelled γ.
@@ -287,12 +288,14 @@ Proof. by destruct a. Qed.
 
 Theorem newCallback_spec P k:
   ⌜ k ≠ #() ⌝ -∗  
+  ⌜ k ≠ #1 ⌝ -∗  
+  ⌜ val_is_unboxed (InjLV k) ⌝ -∗  
   is_waker P k ==∗
     ∃ γ, callback_invariant P γ k CallbackWaiting ∗
           callback_invokation_permit γ 1%Qp ∗ 
           callback_cancellation_permit γ 1%Qp.
 Proof.
-  iIntros "Hunit Hwaker".
+  iIntros "Hunit Hone Hunboxed Hwaker".
   iMod (own_alloc (callback_auth_ra CallbackWaiting k ⋅
                    (◯ (None, None, Some (Cinl 1%Qp), None) ⋅
                     ◯ (None, None, None, Some (Cinl 1%Qp)))))
