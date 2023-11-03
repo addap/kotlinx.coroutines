@@ -22,7 +22,9 @@ Notation algebra := (authUR (prodUR
                                      Some: Invoked
                                   *)
                               (prodUR
-                                (optionUR (agreeR (optionO valO)))
+                                (prodUR 
+                                  (optionUR (agreeR valO))
+                                  (optionUR (agreeR (optionO valO))))
                                 permit)
                               permit)).
 
@@ -45,25 +47,28 @@ Definition permit_auth_ra (present: bool): permit :=
 Definition permit_state_ra (present: bool): permit :=
   Some (if present then Cinl (1 / 2)%Qp else Cinr (to_agree ())).
 
-Definition callback_auth_ra (p: leibnizO callback_state): algebra :=
+Definition callback_auth_ra (p: leibnizO callback_state) (k: valO): algebra :=
   ● match p with
-  | CallbackWaiting => (None, permit_auth_ra true, permit_auth_ra true)
-  | CallbackInvoked v => (Some (to_agree (Some v)), permit_auth_ra false, permit_auth_ra true)
-  | CallbackCancelled => (Some (to_agree None), permit_auth_ra true, permit_auth_ra false)
+  | CallbackWaiting => (Some (to_agree k), None, permit_auth_ra true, permit_auth_ra true)
+  | CallbackInvoked v => (Some (to_agree k), Some (to_agree (Some v)), permit_auth_ra false, permit_auth_ra true)
+  | CallbackCancelled => (Some (to_agree k), Some (to_agree None), permit_auth_ra true, permit_auth_ra false)
   end.
     
 Definition callback_invokation_permit (γ: gname) (q: Qp): iProp Σ :=
-  own γ (◯ (None, Some (Cinl q), None)).
+  own γ (◯ (None, None, Some (Cinl q), None)).
 
 Definition callback_cancellation_permit (γ: gname) (q: Qp): iProp Σ :=
-  own γ (◯ (None, None, Some (Cinl q))).
+  own γ (◯ (None, None, None, Some (Cinl q))).
 
 Definition callback_is_invoked (γ: gname) (v: val): iProp Σ :=
-  own γ (◯ (Some (to_agree (Some v)), permit_state_ra false, None)).
+  own γ (◯ (None, Some (to_agree (Some v)), permit_state_ra false, None)).
   
 Definition callback_is_cancelled (γ: gname): iProp Σ :=
-  own γ (◯ (Some (to_agree None), None, permit_state_ra false)).
-
+  own γ (◯ (None, Some (to_agree None), None, permit_state_ra false)).
+  
+Definition is_callback (γ: gname) (k: val): iProp Σ :=
+  own γ (◯ (Some (to_agree k), None, None, None)).
+  
 Global Instance callback_invokation_permit_Timeless:
   Timeless (callback_invokation_permit γ q).
 Proof. apply _. Qed.
@@ -131,7 +136,7 @@ Theorem callback_is_invoked_not_cancelled γ v:
 Proof.
   iIntros "H1 H2".
   iDestruct (own_valid_2 with "H1 H2")
-    as %[[HValid _]%pair_valid _]%pair_valid.
+    as %[[[_ HValid]%pair_valid _]%pair_valid _]%pair_valid.
   exfalso. move: HValid=> /=. rewrite -Some_op Some_valid=> HValid.
   by apply agree_op_invL' in HValid.
 Qed.
@@ -140,7 +145,7 @@ Definition is_waker (P: val -> iProp Σ) (k : val): iProp Σ := ∀ v, P v -∗ 
 
 Definition callback_invariant (P: val -> iProp Σ) (γ: gname) (k: val)
            (state: callback_state): iProp Σ :=
-  own γ (callback_auth_ra state) ∗ ⌜ k ≠ #() ⌝ ∗
+  own γ (callback_auth_ra state k) ∗ ⌜ k ≠ #() ⌝ ∗
   match state with
     | CallbackWaiting => is_waker P k
     | CallbackInvoked v => True
@@ -150,24 +155,36 @@ Definition callback_invariant (P: val -> iProp Σ) (γ: gname) (k: val)
 Instance callback_state_Inhabited: Inhabited callback_state.
 Proof. econstructor. econstructor. Qed.
 
-Lemma callback_is_invoked_from_auth_ra γ v:
-  own γ (callback_auth_ra (CallbackInvoked v)) ==∗
-  own γ (callback_auth_ra (CallbackInvoked v)) ∗ callback_is_invoked γ v.
+Lemma callback_is_invoked_from_auth_ra γ v k:
+  own γ (callback_auth_ra (CallbackInvoked v) k) ==∗
+  own γ (callback_auth_ra (CallbackInvoked v) k) ∗ callback_is_invoked γ v.
 Proof.
   iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
   apply auth_update_core_id; first by apply _.
   repeat (apply prod_included; split). all: simpl. all: try done.
+  apply None_least.
   apply None_least.
 Qed.
 
-Lemma callback_is_cancelled_from_auth_ra γ:
-  own γ (callback_auth_ra CallbackCancelled) ==∗
-  own γ (callback_auth_ra CallbackCancelled) ∗ callback_is_cancelled γ.
+Lemma callback_is_cancelled_from_auth_ra γ k:
+  own γ (callback_auth_ra CallbackCancelled k) ==∗
+  own γ (callback_auth_ra CallbackCancelled k) ∗ callback_is_cancelled γ.
 Proof.
   iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
   apply auth_update_core_id; first by apply _.
   repeat (apply prod_included; split). all: simpl. all: try done.
   apply None_least.
+  apply None_least.
+Qed.
+
+Theorem is_callback_from_auth_ra γ state k: 
+  own γ (callback_auth_ra state k) ==∗
+  own γ (callback_auth_ra state k) ∗ is_callback γ k.
+Proof.
+  iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
+  apply auth_update_core_id; first by apply _.
+  repeat (apply prod_included; split).
+  all: destruct state; simpl; try done; try apply None_least.
 Qed.
 
 Theorem callback_invokation_permit_exclusive γ q:
@@ -190,6 +207,18 @@ Proof.
   by eapply Qp_not_plus_q_ge_1.
 Qed.
 
+Theorem is_callback_agree γ k k': 
+  is_callback γ k -∗ is_callback γ k' -∗ ⌜ k = k' ⌝.
+Proof.
+  iIntros "H1 H2".
+  iDestruct (own_valid_2 with "H1 H2") as %HValid.
+  iPureIntro. move: HValid.
+  case; case; case=> /= HValid _ _ _.
+  move: HValid.
+  rewrite Some_valid.
+  apply agree_op_invL'.
+Qed.
+
 Theorem invokeCallback_spec P γ k (v: val):
   callback_invokation_permit γ 1%Qp -∗
   callback_invariant P γ k CallbackWaiting -∗
@@ -202,15 +231,16 @@ Proof.
   iSplitL "Hk HP". 
   - iModIntro.  
     iApply ("Hk" with "HP").
-  - iAssert (|==> own γ (callback_auth_ra (CallbackInvoked v)) ∗ callback_is_invoked γ v)%I with "[H● HInvoke]" as ">[H● HCallbackInvoked]".
+  - iAssert (|==> own γ (callback_auth_ra (CallbackInvoked v) k) ∗ callback_is_invoked γ v)%I with "[H● HInvoke]" as ">[H● HCallbackInvoked]".
     { 
       iApply own_op.
       iApply (own_update_2 with "H● HInvoke").
       rewrite /callback_auth_ra. 
       apply auth_update with
-          (a' := (Some (to_agree (Some v)),
+          (a' := (Some (to_agree k), Some (to_agree (Some v)),
                   permit_auth_ra false, permit_auth_ra true)).
       repeat apply prod_local_update'.
+      - by done.
       - by apply alloc_option_local_update.
       - rewrite /permit_auth_ra.
         etransitivity.
@@ -231,15 +261,16 @@ Theorem cancelCallback_spec P γ k (v: val):
 Proof.
   iIntros "HCancel (H● & % & Hk)".
   iSplitL "Hk"; first done.
-  iAssert (|==> own γ (callback_auth_ra CallbackCancelled) ∗ callback_is_cancelled γ)%I with "[H● HCancel]" as ">[H● HCallbackCancelled]".
+  iAssert (|==> own γ (callback_auth_ra CallbackCancelled k) ∗ callback_is_cancelled γ)%I with "[H● HCancel]" as ">[H● HCallbackCancelled]".
   { 
     iApply own_op.
     iApply (own_update_2 with "H● HCancel").
     rewrite /callback_auth_ra. 
     apply auth_update with
-        (a' := (Some (to_agree None),
+        (a' := (Some (to_agree k), Some (to_agree None),
                 permit_auth_ra true, permit_auth_ra false)).
     repeat apply prod_local_update'.
+    - by done.
     - by apply alloc_option_local_update.
     - done.
     - rewrite /permit_auth_ra.
@@ -251,6 +282,9 @@ Proof.
   iFrame. by iSplit.
 Qed.
 
+Lemma None_op_right_id (A: cmraT) (a: option A): a ⋅ None = a.
+Proof. by destruct a. Qed.
+
 Theorem newCallback_spec P k:
   ⌜ k ≠ #() ⌝ -∗  
   is_waker P k ==∗
@@ -259,13 +293,16 @@ Theorem newCallback_spec P k:
           callback_cancellation_permit γ 1%Qp.
 Proof.
   iIntros "Hunit Hwaker".
-  iMod (own_alloc (callback_auth_ra CallbackWaiting ⋅
-                   (◯ (None, Some (Cinl 1%Qp), None) ⋅
-                    ◯ (None, None, Some (Cinl 1%Qp)))))
+  iMod (own_alloc (callback_auth_ra CallbackWaiting k ⋅
+                   (◯ (None, None, Some (Cinl 1%Qp), None) ⋅
+                    ◯ (None, None, None, Some (Cinl 1%Qp)))))
     as (γ) "[H● [H◯ H◯']]".
   {
     apply auth_both_valid. split; last done.
-    repeat (apply prod_included'; split). all: by simpl.
+    repeat (apply prod_included'; split). all: try by simpl.
+    simpl.
+    rewrite None_op_right_id.
+    apply None_least.
   }
   iModIntro.
   iExists _. by iFrame.

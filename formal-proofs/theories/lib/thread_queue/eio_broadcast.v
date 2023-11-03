@@ -2282,30 +2282,83 @@ Proof.
   by iLeft. 
 Qed.
 
+Lemma read_cell_value_by_canceller_spec γtq γa γe γd γk i ptr e d k:
+  {{{ is_thread_queue γa γtq γe γd e d ∗
+      cell_location γtq γa i ptr ∗
+      rendezvous_thread_locs_state γtq γk k i ∗
+      callback_cancellation_permit γk 1%Qp }}}
+    !#ptr
+  {{{ (v: val), RET v;
+      ⌜v = EIORESUMEDV⌝ ∨ 
+      ⌜v = InjLV k⌝ ∗ callback_cancellation_permit γk 1%Qp
+  }}}.
+Proof.
+Admitted.
+
+(* Lemma take_cell_value_by_canceller_spec γtq γa *)
+
 Theorem try_cancel_spec γa γtq γe γd e d γk r:
   {{{ is_thread_queue γa γtq γe γd e d ∗ 
       callback_cancellation_permit γk 1%Qp ∗
       is_thread_queue_suspend_result γtq γa γk r }}}
     try_cancel array_interface r
-  {{{ b, RET #b; if b then ∃ is_waker 
-
-  {{{ }}}
-  is_thread_queue γa γtq γe γd e d -∗
-  is_thread_queue_suspend_result γtq γa γk r -∗
-  <<< (* ▷ thread_queue_future_cancellation_permit γf *) True >>>
-    try_cancel r @ ⊤ ∖ ↑NTq
-  <<< ∃ (r: bool),
-      if r then 
-        ∃ i k, 
-        is_infinite_array_cell_pointer _ _ array_spec NArr γa e i
-        ∗ rendezvous_thread_handle γtq γk k i ∗
-        inhabited_rendezvous_state γtq i (Some (Cinr (Cinl (to_agree ()))))
-             ∗ ▷ cancellation_handle γa i
-      else
-        True,
-        (* thread_queue_future_cancellation_permit γf, *)
-      RET #r >>>.
+  {{{ (b: bool), RET #b; if b then 
+                  ∃ k, is_waker V' k ∗ 
+                        callback_is_cancelled γk ∗ 
+                        is_callback γk k 
+                  else True }}}.
 Proof.
+  iIntros (Φ) "(#HTq & HCancel & HRes) HΦ".
+  iDestruct "HRes" as (k i s) "(-> & (HUnit & #HLoc) & #HArray)".
+  assert (HOne: (k ≠ #1)%I) by admit.
+  iDestruct "HUnit" as %HUnit.
+  wp_lam.
+  wp_bind (derefCellPointer _ _). iApply (derefCellPointer_spec with "[]").
+  { iDestruct "HTq" as "(_ & $ & _)". done. }
+  iIntros "!>" (ℓ) "#H↦". wp_pures. 
+  wp_bind (!_)%E. iApply (read_cell_value_by_canceller_spec with "[HCancel]").
+  { iFrame. iSplit; last iSplit; by iAssumption. }
+  iNext.
+  iIntros (v) "[->|[-> HCancel]]".
+  - (* already resumed so we just return false. *)
+    wp_pures.
+    by iApply "HΦ".
+  - (* at the moment there is an uncancelled callback. We try to CAS it and then call it. *)
+    wp_pures. 
+    rewrite bool_decide_false; last by injection.
+    wp_pures. 
+    rewrite bool_decide_false; last by injection.
+    wp_pures.
+    iDestruct "HTq" as "(HInv & HInfArr & _ & _)". wp_bind (CmpXchg _ _ _).
+    iInv "HInv" as (l deqFront) "(>H● & HRRs & >HLen)" "HTqClose".
+    iDestruct "HLen" as %HLen.
+    iPoseProof (cell_list_contents_ra_locs with "H● HLoc") as "H".
+    iDestruct "H" as %(c & HEl).
+    iDestruct (big_sepL_lookup_acc with "HRRs") as "[HRR HRRsRestore]";
+      first done.
+    destruct c as [[|]|].
+    + (* now the callback is already resumed. *)
+      iDestruct "HRR" as "(>HIsSus & >#HLoc' & HRR)".
+      iDestruct "HRR" as (ℓ') "(H↦' & [Hℓ|Hℓ] & HRR)".
+      iDestruct (infinite_array_mapsto_agree with "H↦ H↦'") as "><-".
+    + simpl in HInc.
+      
+      
+    + (* callback has been cancelled.*)
+    2: { exfalso. simpl in *. move: HInc. rewrite csum_included.
+         case; first done. case; by intros (? & ? & ? & ? & ?). }
+    move: HInc. rewrite Cinl_included pair_included to_agree_included. case=> HEq _.
+    simplify_eq.
+    iDestruct (big_sepL_insert_acc with "HRRs") as "[HRR HRRsRestore]";
+      first done.
+    simpl. iDestruct "HRR" as "(HIsRes & HCancHandle & >% & HRR)".
+    iDestruct "HRR" as (ℓ) "[H↦' HRR]".
+    iDestruct (infinite_array_mapsto_agree with "H↦ H↦'") as "><-".
+    destruct c' as [[|]|]=> /=.
+
+  
+
+Admitted.
 
 Theorem try_cancel_spec γa γtq γe γd e d γk r:
   is_thread_queue γa γtq γe γd e d -∗
