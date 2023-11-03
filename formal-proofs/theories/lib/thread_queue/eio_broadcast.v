@@ -2521,58 +2521,6 @@ Proof.
       iFrame.
 Qed.
 
-(* Theorem try_cancel_spec γa γtq γe γd e d γk r:
-  is_thread_queue γa γtq γe γd e d -∗
-  is_thread_queue_suspend_result γtq γa γk r -∗
-  <<< (* ▷ thread_queue_future_cancellation_permit γf *) True >>>
-    try_cancel r @ ⊤ ∖ ↑NTq
-  <<< ∃ (r: bool),
-      if r then 
-        ∃ i k, 
-        is_infinite_array_cell_pointer _ _ array_spec NArr γa e i
-        ∗ rendezvous_thread_handle γtq γk k i ∗
-        inhabited_rendezvous_state γtq i (Some (Cinr (Cinl (to_agree ()))))
-             ∗ ▷ cancellation_handle γa i
-      else
-        True,
-        (* thread_queue_future_cancellation_permit γf, *)
-      RET #r >>>.
-Proof.
-  iIntros (HMask) "#HTq #HFuture". iIntros (Φ) "AU". wp_lam.
-  iDestruct "HFuture" as (f') "[HFuture|HFuture]".
-  - iDestruct "HFuture" as "(HFuture & -> & HFInv & HCompl)".
-    iDestruct "HCompl" as (v) "#HCompl". wp_pures.
-    awp_apply (tryCancelFuture_spec with "HFuture").
-    iInv "HFInv" as ">HCancPermit".
-    iApply (aacc_aupd_commit with "AU"); first done.
-    iIntros ">HPermit". rewrite /thread_queue_future_cancellation_permit.
-    iCombine "HCancPermit" "HPermit" as "HPermit".
-    rewrite -future_cancellation_permit_Fractional Qp_half_half.
-    iAaccIntro with "HPermit".
-    {
-      iIntros "HPermit".
-      iEval (rewrite -Qp_half_half future_cancellation_permit_Fractional)
-        in "HPermit".
-      iDestruct "HPermit" as "[$ $]". by iIntros "!> $".
-    }
-    iIntros (r) "Hr". destruct r.
-    by iDestruct (future_is_completed_not_cancelled with "HCompl Hr") as %[].
-    iDestruct "Hr" as "[_ HCancPermit]".
-    iEval (rewrite -Qp_half_half future_cancellation_permit_Fractional)
-      in "HCancPermit".
-    iExists false. iDestruct "HCancPermit" as "[$ $]".
-    iSplitL; last by iIntros "!> $". by iExists _.
-  - iDestruct "HFuture" as (i' s ->) "[HTh HLoc]". wp_pures.
-    awp_apply (try_cancel_cell with "HTq HTh"); first done.
-    iApply (aacc_aupd_commit with "AU"); first done. iIntros ">HPermit".
-    iAaccIntro with "HPermit". by iIntros "$ !> $".
-    iIntros (r) "Hr !>". iExists r. iSplitL; last by iIntros "$ !>".
-    destruct r.
-    + iDestruct "Hr" as "[$ Hr]". iExists _, _, _. iFrame "HLoc".
-      iSplitR; first done. by iFrame.
-    + iDestruct "Hr" as "[Hr $]". iDestruct "Hr" as (?) "[_ Hr]".
-      by iExists _.
-Qed. *)
 
 End proof.
 
