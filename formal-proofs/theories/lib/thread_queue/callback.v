@@ -8,6 +8,8 @@ From iris.bi.lib Require Import fractional.
 From iris.heap_lang Require Import proofmode.
 From iris.algebra Require Import cmra excl csum auth csum numbers.
 
+Definition newCallback : val := (λ: "k", ref "k").
+
 Section proof.
 
 Inductive callback_state :=
@@ -142,11 +144,11 @@ Proof.
 Qed.
 
 Definition is_waker (P: val -> iProp Σ) (k : val): iProp Σ := ∀ v, P v -∗ WP (k v) {{r, ⌜ r = #() ⌝}}.
-
-Definition callback_invariant (P: val -> iProp Σ) (γ: gname) (k: val)
+(* TODO rename to callback_resources *)
+Definition callback_invariant (P: val -> iProp Σ) (γ: gname) (l: loc)
            (state: callback_state): iProp Σ :=
+  ∃ (k: val), l ↦ k ∗
   own γ (callback_auth_ra state k) ∗ 
-  (⌜ k ≠ #() ⌝ ∗ ⌜ k ≠ #1 ⌝ ∗ ⌜ val_is_unboxed (InjLV k) ⌝) ∗
   match state with
     | CallbackWaiting => is_waker P k
     | CallbackInvoked v => True
@@ -156,8 +158,8 @@ Definition callback_invariant (P: val -> iProp Σ) (γ: gname) (k: val)
 Instance callback_state_Inhabited: Inhabited callback_state.
 Proof. econstructor. econstructor. Qed.
 
-Lemma callback_is_invoked_from_auth_ra γ v k:
-  own γ (callback_auth_ra (CallbackInvoked v) k) ==∗
+Lemma callback_is_invoked_from_auth_ra E' γ v k:
+  own γ (callback_auth_ra (CallbackInvoked v) k) ={E'}=∗
   own γ (callback_auth_ra (CallbackInvoked v) k) ∗ callback_is_invoked γ v.
 Proof.
   iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
@@ -167,8 +169,8 @@ Proof.
   apply None_least.
 Qed.
 
-Lemma callback_is_cancelled_from_auth_ra γ k E:
-  own γ (callback_auth_ra CallbackCancelled k) ={E}=∗
+Lemma callback_is_cancelled_from_auth_ra E' γ k:
+  own γ (callback_auth_ra CallbackCancelled k) ={E'}=∗
   own γ (callback_auth_ra CallbackCancelled k) ∗ callback_is_cancelled γ.
 Proof.
   iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
@@ -178,8 +180,8 @@ Proof.
   apply None_least.
 Qed.
 
-Theorem is_callback_from_auth_ra γ state k: 
-  own γ (callback_auth_ra state k) ==∗
+Theorem is_callback_from_auth_ra E' γ state k: 
+  own γ (callback_auth_ra state k) ={E'}=∗
   own γ (callback_auth_ra state k) ∗ is_callback γ k.
 Proof.
   iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
@@ -220,15 +222,19 @@ Proof.
   apply agree_op_invL'.
 Qed.
 
-Theorem invokeCallback_spec P γ k (v: val):
+Theorem invokeCallback_spec E' P γ l k (v: val):
+  is_callback γ k -∗
   callback_invokation_permit γ 1%Qp -∗
-  callback_invariant P γ k CallbackWaiting -∗
-  P v ==∗
+  callback_invariant P γ l CallbackWaiting -∗
+  P v ={E'}=∗
     WP (k v) {{r, ⌜ r = #() ⌝ }} ∗
-    callback_invariant P γ k (CallbackInvoked v) ∗
+    callback_invariant P γ l (CallbackInvoked v) ∗
     callback_is_invoked γ v.
 Proof.
-  iIntros "HInvoke (H● & % & Hk) HP".
+  iIntros "HIsCallback HInvoke HInv HP".
+  iDestruct "HInv" as (k') "(Hptr & H● & Hk)".
+  iMod (is_callback_from_auth_ra with "H●") as "[H● HIsCallback']".
+  iDestruct (is_callback_agree with "HIsCallback HIsCallback'") as %<-.
   iSplitL "Hk HP". 
   - iModIntro.  
     iApply ("Hk" with "HP").
@@ -250,17 +256,22 @@ Proof.
       - done.
     }
     iModIntro.
-    iFrame. by iSplit.
+    iFrame.
+    iExists k. by iFrame.
 Qed.
 
-Theorem cancelCallback_spec P γ k E:
+Theorem cancelCallback_spec E' P γ l k:
+  is_callback γ k -∗
   callback_cancellation_permit γ 1%Qp -∗
-  callback_invariant P γ k CallbackWaiting ={E}=∗
+  callback_invariant P γ l CallbackWaiting ={E'}=∗
     is_waker P k ∗
-    callback_invariant P γ k CallbackCancelled ∗
+    callback_invariant P γ l CallbackCancelled ∗
     callback_is_cancelled γ.
 Proof.
-  iIntros "HCancel (H● & % & Hk)".
+  iIntros "HIsCallback HCancel HInv".
+  iDestruct "HInv" as (k') "(Hptr & H● & Hk)".
+  iMod (is_callback_from_auth_ra with "H●") as "[H● HIsCallback']".
+  iDestruct (is_callback_agree with "HIsCallback HIsCallback'") as %<-.
   iSplitL "Hk"; first done.
   iAssert (|==> own γ (callback_auth_ra CallbackCancelled k) ∗ callback_is_cancelled γ)%I with "[H● HCancel]" as ">[H● HCallbackCancelled]".
   { 
@@ -280,22 +291,23 @@ Proof.
       by apply alloc_option_local_update.
   }
   iModIntro.
-  iFrame. by iSplit.
+  iFrame. 
+  iExists k. by iFrame.
 Qed.
 
 Lemma None_op_right_id (A: cmraT) (a: option A): a ⋅ None = a.
 Proof. by destruct a. Qed.
 
 Theorem newCallback_spec P k:
-  ⌜ k ≠ #() ⌝ -∗  
-  ⌜ k ≠ #1 ⌝ -∗  
-  ⌜ val_is_unboxed (InjLV k) ⌝ -∗  
-  is_waker P k ==∗
-    ∃ γ, callback_invariant P γ k CallbackWaiting ∗
-          callback_invokation_permit γ 1%Qp ∗ 
-          callback_cancellation_permit γ 1%Qp.
+  {{{ is_waker P k }}}
+    newCallback k
+  {{{ l γ, RET #l; 
+        is_callback γ k ∗
+        callback_invariant P γ l CallbackWaiting ∗
+        callback_invokation_permit γ 1%Qp ∗ 
+        callback_cancellation_permit γ 1%Qp }}}.
 Proof.
-  iIntros "Hunit Hone Hunboxed Hwaker".
+  iIntros (HΦ) "Hwaker HΦ".
   iMod (own_alloc (callback_auth_ra CallbackWaiting k ⋅
                    (◯ (None, None, Some (Cinl 1%Qp), None) ⋅
                     ◯ (None, None, None, Some (Cinl 1%Qp)))))
@@ -307,7 +319,14 @@ Proof.
     rewrite None_op_right_id.
     apply None_least.
   }
+  rewrite -fupd_wp.
+  iMod (is_callback_from_auth_ra with "H●") as "[H● HIsCallback]".
   iModIntro.
+  wp_lam. 
+  wp_alloc ℓ as "Hℓ". 
+  iApply "HΦ".
+  instantiate (1:=γ).
+  iFrame. 
   iExists _. by iFrame.
 Qed.
 
