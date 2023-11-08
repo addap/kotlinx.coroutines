@@ -143,6 +143,27 @@ Proof.
   by apply agree_op_invL' in HValid.
 Qed.
 
+Theorem callback_is_invoked_not_waiting γ v k:
+  callback_is_invoked γ v -∗ own γ (callback_auth_ra CallbackWaiting k) -∗ False.
+Proof.
+  (* a.d. learn how ssreflect proofs work or just do it in the traditional way. *)
+  iIntros "H1 H2". 
+  rewrite /callback_is_invoked /callback_auth_ra.
+  iDestruct (own_valid_2 with "H2 H1") as "H".
+  iDestruct "H" as %HValid.
+  exfalso. move: HValid=> /=. rewrite auth_both_valid.
+  case. move=> HValid _. move: HValid. 
+  do 3 rewrite pair_included. do 3 case.
+  move=> _ HContra _ _.
+  move: HContra.
+  rewrite option_included.
+  case; first done.
+  case. move=> ?.
+  case. move=> ?.
+  case. move=> _.
+  case. done.
+Qed.
+
 Definition is_waker (P: val -> iProp Σ) (k : val): iProp Σ := ∀ v, P v -∗ WP (k v) {{r, ⌜ r = #() ⌝}}.
 (* TODO rename to callback_resources *)
 Definition callback_invariant (P: val -> iProp Σ) (γ: gname) (l: loc)
@@ -222,19 +243,19 @@ Proof.
   apply agree_op_invL'.
 Qed.
 
-Theorem invokeCallback_spec E' P γ l k (v: val):
-  is_callback γ k -∗
+Theorem invokeCallback_spec E' P γ l (v: val):
   callback_invokation_permit γ 1%Qp -∗
   callback_invariant P γ l CallbackWaiting -∗
   P v ={E'}=∗
-    WP (k v) {{r, ⌜ r = #() ⌝ }} ∗
+    ∃ (k: val), WP (k v) {{r, ⌜ r = #() ⌝ }} ∗
     callback_invariant P γ l (CallbackInvoked v) ∗
-    callback_is_invoked γ v.
+    callback_is_invoked γ v ∗
+    is_callback γ k.
 Proof.
-  iIntros "HIsCallback HInvoke HInv HP".
-  iDestruct "HInv" as (k') "(Hptr & H● & Hk)".
+  iIntros "HInvoke HInv HP".
+  iDestruct "HInv" as (k) "(Hptr & H● & Hk)".
   iMod (is_callback_from_auth_ra with "H●") as "[H● HIsCallback']".
-  iDestruct (is_callback_agree with "HIsCallback HIsCallback'") as %<-.
+  iExists _.
   iSplitL "Hk HP". 
   - iModIntro.  
     iApply ("Hk" with "HP").
