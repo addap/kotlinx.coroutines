@@ -298,11 +298,6 @@ a.d. TODO we probably need something similar for our formulation with a waker in
 
 
 
-Definition resources_for_resumer T γf γd i: iProp :=
-  ((callback_invokation_permit γf 1%Qp ∨
-    callback_invokation_permit γf (1/2)%Qp ∗ iterator_issued γd i) ∗ T ∨
-   callback_invokation_permit γf 1%Qp ∗ iterator_issued γd i).
-
 (* a.d. I think this is the big cell state transition system (or at least just all the cell states, lemmas would describe which transitions are allowed.
 
 γtg : ghost cell for thread queue
@@ -367,8 +362,9 @@ following is true:
                   E ∗ (if insideDeqFront then R else True) ∗
                   (* this describes the logical state of the callack. A waiting callback contains the WP 
                       asserting that the closure is safe to execute. *)
+                  (* a.d. TODO in the future I want to just have the callback_invariant here and store the invokation permit inside. 
+                     Then when invoking we just save a callback_is_invoked in cell_resources, similar for cancelling. *)
                   callback_invariant V' γk ℓk CallbackWaiting ∗
-                  (* a.d. TODO I think this can just be callback_invokation_permit γk 1 *)
                   callback_invokation_permit γk 1%Qp
          (* RESUMED *)
          | Some (cellResumed) =>
@@ -383,8 +379,8 @@ following is true:
            ℓ ↦ CANCELLEDV ∗
            (* future_is_cancelled γf ∗ *)
            callback_invariant V' γk ℓk CallbackCancelled ∗
-           (* resources_for_resumer (if insideDeqFront then R else True) γk γd i *)
-           (* a.d. since I have a simpler state transition system it could work that I just have the resource here. *)
+           (* a.d. TODO resume has to return an R if the cell is already cancelled so we have this disjunction so that it can 
+              swap out the R for its iterator_issued γd i. *)
            (iterator_issued γd i ∨ if insideDeqFront then R else True)
          end
   end.
@@ -2559,5 +2555,5 @@ Typeclasses Opaque inhabited_rendezvous_state
  thread_queue_state deq_front_at_least
  rendezvous_thread_locs_state rendezvous_filled_value
  rendezvous_thread_handle rendezvous_initialized suspension_permit
- awakening_permit resources_for_resumer cell_resources cell_enqueued
+ awakening_permit cell_resources cell_enqueued
  thread_queue_invariant is_thread_queue_suspend_result.
