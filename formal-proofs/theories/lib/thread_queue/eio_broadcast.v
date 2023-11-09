@@ -385,7 +385,7 @@ following is true:
            callback_invariant V' γk ℓk CallbackCancelled ∗
            (* resources_for_resumer (if insideDeqFront then R else True) γk γd i *)
            (* a.d. since I have a simpler state transition system it could work that I just have the resource here. *)
-           (resources_for_resumer (if insideDeqFront then R else True) γk γd i)
+           (iterator_issued γd i ∨ if insideDeqFront then R else True)
          end
   end.
 
@@ -896,8 +896,8 @@ Proof.
     destruct v as [[|? ? [[|]|]]|]=>//.
     + iDestruct "H" as "($ & H)". iDestruct "H" as (? ?) "H".
       iExists _, _. 
-      iDestruct "H" as "($ & $ & $ & $ & $ & H)".
-      iDestruct "H" as "[[H _]|H]"; [iLeft|iRight]; iFrame; done.
+      iDestruct "H" as "($ & $ & $ & $ & $ & _)".
+      by iFrame.
     + iDestruct "H" as "($ & H)".  iDestruct "H" as (? ?) "H".
       iExists _, _. iNext. iDestruct "H" as "(-> & $ & $ & $ & $ & $ & _ & $ & $)".
       by iFrame.
@@ -1343,8 +1343,8 @@ Proof.
   rewrite bool_decide_true; last lia.
   simpl. iDestruct "HRR" as "(HIsSus & HRR)".
   iDestruct "HRR" as (ℓ' ℓk') "(>-> & H↦' & HLoc & Hℓ & HRR)".
-  iDestruct "HRR" as "(HCallback & [[[HFuture|[_ >HC]] HR]|[_ >HC]])".
-  all: try by iDestruct (iterator_issued_exclusive with "HC HIsRes") as %[].
+  iDestruct "HRR" as "(HCallback & [>HIsRes' | HR])".
+  1: iDestruct (iterator_issued_exclusive with "HIsRes HIsRes'") as %[].
   iFrame "HR".
   iMod ("HClose" with "[-]"); last done. iExists _, _. iFrame "H● HRest".
   iApply "HRRs". iFrame. iExists _, _. by iFrame.
@@ -1962,9 +1962,8 @@ Proof.
     iDestruct "HRR" as "(_ & >HContra & _)".
     iDestruct (iterator_issued_exclusive with "HContra HIsRes") as %[].
   - (* Cell is cancelled *)
-    iDestruct "HRR" as "(Hℓ & HCallback & [HCompletion|[_ HC]])".
-    iDestruct "HCompletion" as "[[HCompletionPermit|[_ HC]] HR]".
-    all: try by iDestruct (iterator_issued_exclusive with "HIsRes HC") as ">[]".
+    iDestruct "HRR" as "(Hℓ & HCallback & [HIsRes'|HR])".
+    1: by iDestruct (iterator_issued_exclusive with "HIsRes HIsRes'") as ">[]".
     wp_load.
     iSpecialize ("HΦ" $! CANCELLEDV with "[HR]").
     { iRight. iLeft. by iFrame. }
@@ -2036,14 +2035,10 @@ Proof.
       first done.
     rewrite bool_decide_true; last by lia.
     iDestruct "HRR" as "(HIsSus & HRR)".
-    iDestruct "HRR" as (??) "(>-> & #H↦' & _ & Hptr & HCallback & HRRes)".
+    iDestruct "HRR" as (??) "(>-> & #H↦' & _ & Hptr & HCallback & [>HIsRes'|HR])".
+    iDestruct (iterator_issued_exclusive with "HIsRes HIsRes'") as %[].
     iDestruct (infinite_array_mapsto_agree with "H↦ H↦'") as "><-".
     wp_cmpxchg_fail.
-    iAssert (resources_for_resumer R γk γd i ∗ R)%I with "[HRRes HIsRes]" as "(HRRes & HR)".
-    { rewrite /resources_for_resumer.
-      iDestruct "HRRes" as "[[[HInvoke|[_ HIsRes']] HR]|[_ HIsRes']]".
-      2-3: iDestruct (iterator_issued_exclusive with "HIsRes HIsRes'") as %[].
-      iFrame "HR". iRight. by iFrame. }
     iMod ("HClose" with "[-HΦ HR]") as "_".
     { iExists _, _. iFrame. iSplit; last done. 
       iNext. iApply "HRRsRestore". 
