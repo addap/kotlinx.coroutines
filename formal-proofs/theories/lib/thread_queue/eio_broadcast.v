@@ -95,6 +95,7 @@ End impl.
 From iris.base_logic.lib Require Import invariants.
 From iris.heap_lang Require Import proofmode.
 From iris.algebra Require Import auth numbers list gset excl csum.
+From iris.algebra.lib Require Import excl_auth.
 
 Section proof.
 
@@ -151,8 +152,13 @@ Notation dequeueUR := (prodUR natUR max_natUR).
 Notation algebra := (authUR (prodUR (prodUR enqueueUR dequeueUR)
                                     queueContentsUR)).
 
-Class threadQueueG Σ := ThreadQueueG { thread_queue_inG :> inG Σ algebra }.
-Definition threadQueueΣ : gFunctors := #[GFunctor algebra].
+Notation resume_algreba := (exclR unitO).
+                              
+Class threadQueueG Σ := ThreadQueueG { 
+  thread_queue_inG :> inG Σ algebra;
+  resume_inG :> inG Σ resume_algreba
+}.
+Definition threadQueueΣ : gFunctors := #[GFunctor algebra; GFunctor resume_algreba].
 Instance subG_threadQueueΣ {Σ} : subG threadQueueΣ Σ -> threadQueueG Σ.
 Proof. solve_inG. Qed.
 
@@ -193,6 +199,9 @@ Definition cellState_ra (state: cellState): cellStateR :=
   | cellInhabited γk ℓk r => Cinr (to_agree (γk, ℓk),
                                 option_map cellTerminalState_ra r)
   end.
+    
+Definition resume_all_ra : resume_algreba :=
+  Excl ().
 
 (* a.d. one fragment of the algebra, it describes the state of one cell. *)
 Definition rendezvous_state γtq i (r: option cellStateR) :=
@@ -274,6 +283,8 @@ Definition rendezvous_initialized γtq i: iProp :=
 Definition suspension_permit γ := own γ (◯ (1%nat, ε, ε)).
 
 Definition awakening_permit γ := own γ (◯ (ε, (1%nat, ε), ε)).
+
+Definition resume_all_permit γ := own γ (resume_all_ra).
 
 Variable array_interface: infiniteArrayInterface.
 Variable array_spec: infiniteArraySpec _ array_interface.
@@ -500,14 +511,14 @@ Definition thread_queue_invariant γa γtq γe γd l deqFront: iProp :=
       ([∗ list] i ↦ e ∈ l, cell_resources γtq γa γe γd i e
                                           (bool_decide (i < deqFront))) ∗
       ⌜deqFront ≤ length l⌝.
-
+        
 (* Physically, a CQS consists of an infinite array and two iterators, one, the enqueue iterator, bounded by the suspension
 permits, and another, the dequeue iterator, bounded by awakening permits.
  *)
-Definition is_thread_queue γa γtq γe γd e d :=
+Definition is_thread_queue γa γtq γe γd γres e d :=
 (* here we instantiate the cell_is_owned predicate, either it is "inhabited" or "filled". *)
   let co := rendezvous_initialized γtq in
-  (inv NTq (∃ l deqFront, thread_queue_invariant γa γtq γe γd l deqFront) ∗
+  (inv NTq (∃ l deqFront, ((⌜ deqFront = 0 ⌝ ∨ resume_all_permit γres) ∗ thread_queue_invariant γa γtq γe γd l deqFront)) ∗
    is_infinite_array _ _ array_spec NArr γa co ∗
    is_iterator _ array_spec NArr NEnq co γa (suspension_permit γtq) γe e ∗
    is_iterator _ array_spec NArr NDeq co γa (awakening_permit γtq) γd d)%I.
@@ -515,8 +526,8 @@ Definition is_thread_queue γa γtq γe γd e d :=
 Theorem newThreadQueue_spec:
   {{{ inv_heap_inv }}}
     newThreadQueue array_interface #()
-  {{{ γa γtq γe γd e d, RET (e, d); is_thread_queue γa γtq γe γd e d
-      ∗ thread_queue_state γtq 0 }}}.
+  {{{ γa γtq γe γd γres e d, RET (e, d); is_thread_queue γa γtq γe γd γres e d
+      ∗ thread_queue_state γtq 0 ∗ resume_all_permit γres }}}.
 Proof.
   iIntros (Φ) "HHeap HΦ". wp_lam. wp_bind (newInfiniteArray _ _).
   rewrite -fupd_wp.
@@ -529,6 +540,8 @@ Proof.
     - apply pair_valid. split; first done.
       apply pair_valid. split; last done. apply list_lookup_valid.
       by case. }
+  iMod (own_alloc (resume_all_ra)) as (γres) "Hres".
+  { done. }
   replace 2%Z with (Z.of_nat 2); last lia.
   iApply (newInfiniteArray_spec with "[HHeap]").
   { iSplitR. by iPureIntro; lia. done. }
@@ -541,11 +554,13 @@ Proof.
   iApply (newIterator_spec with "[HE]"); first by simpl; iFrame.
   iIntros "!>" (γe e) "HEnq".
   iMod (inv_alloc NTq _
-        (∃ l deqFront, thread_queue_invariant γa γtq γe γd l deqFront)
+        (∃ l deqFront, (⌜ deqFront = 0 ⌝ ∨ resume_all_permit γres) ∗ thread_queue_invariant γa γtq γe γd l deqFront)
        with "[H●]") as "#HInv".
-  { iExists [], 0. iFrame. simpl. iPureIntro. split; done.
+  { iExists [], 0. iFrame. simpl.
+    iSplit; first by iLeft.  
+    iPureIntro. split; done.
     }
-  iSpecialize ("HΦ" $! γa γtq γe γd e d).
+  iSpecialize ("HΦ" $! γa γtq γe γd γres e d).
   iModIntro. wp_pures. iApply "HΦ". by iFrame.
 Qed.
 
@@ -590,16 +605,17 @@ Qed.
 
 (* a.d. Enqueue registration It is possible to provide an E, increasing the size and obtaining in exchange a suspension
 permit — a permission to call suspend(). *)
-Theorem thread_queue_append' E' γtq γa γe γd n e d:
+Theorem thread_queue_append' E' γtq γa γe γd γres n e d:
   ↑NTq ⊆ E' ->
-  is_thread_queue γa γtq γe γd e d -∗
+  is_thread_queue γa γtq γe γd γres e d -∗
   ▷ E -∗ ▷ thread_queue_state γtq n ={E'}=∗
   thread_queue_state γtq (S n) ∗ suspension_permit γtq.
 Proof.
   iIntros (HMask) "[HInv _] HE >HState".
-  iInv "HInv" as (l deqFront) "HOpen" "HClose".
+  iInv "HInv" as (l deqFront) "[HResShot HOpen]" "HClose".
   iMod (thread_queue_append with "HE HState HOpen") as "(>$ & _ & >$ & HRest)".
-  iMod ("HClose" with "[HRest]") as "_"; last done. by iExists _, _.
+  iMod ("HClose" with "[HResShot HRest]") as "_"; last done. iExists _, _.
+  by iFrame.
 Qed.
 
 Global Instance deq_front_at_least_persistent γtq n:
@@ -950,26 +966,36 @@ Qed.
 
 (* a.d. Dequeue registration If it is known that the size is nonzero, it is possible to decrease the size and provide an R,
 obtaining in exchange an awakening permit — a permission to call resume(v). *)
-Theorem thread_queue_register_for_dequeue' E' γtq γa γe γd n e d:
+(* Theorem thread_queue_register_for_dequeue' E' γtq γa γe γd γres n e d:
   ↑NTq ⊆ E' ->
   n > 0 ->
-  is_thread_queue γa γtq γe γd e d -∗
+  is_thread_queue γa γtq γe γd γres e d -∗
   ▷ R -∗ ▷ thread_queue_state γtq n ={E'}=∗
   thread_queue_state γtq (n - 1) ∗ awakening_permit γtq.
 Proof.
   iIntros (HMask Hn) "[HInv _] HR >HState".
-  iInv "HInv" as (l deqFront) "HOpen" "HClose".
+  iInv "HInv" as (l deqFront) "(HResShot & HOpen)" "HClose".
   iAssert (▷⌜deqFront < length l⌝)%I with "[-]" as "#>HLen".
-  { iDestruct "HOpen" as "[>H● _]".
+  { iDestruct "HOpen" as "(>H● & _)".
     iDestruct (thread_queue_state_valid with "H● HState") as %->.
     rewrite drop_length in Hn.
     iPureIntro. lia. }
   iDestruct "HLen" as %HLen.
   iMod (thread_queue_register_for_dequeue with "HR HOpen HState")
        as "(>HAwak & _ & HOpen & >HState)"=> //.
-  iFrame. iMod ("HClose" with "[HOpen]"); last done.
-  by iExists _, _.
-Qed.
+  iFrame. iMod ("HClose" with "[HResShot HOpen]"); last done.
+  iExists _, _. iFrame.
+Qed. *)
+
+(* new theorem to change thread queue state and dequeue everything. *)
+(* Theorem thread_queue_register_for_dequeue_all E' γtq γa γe γd n e d:
+  ↑NTq ⊆ E' ->
+  is_thread_queue γa γtq γe γd γres e d -∗
+  □ ▷ R -∗ ▷ thread_queue_state γtq n ={E'}=∗
+  thread_queue_state γtq 0 ∗ ([∗] replicate n (awakening_permit γtq)).
+Proof.
+  (* a.d. TODO should be doable by simple induction on n *)
+Admitted. *)
 
 Lemma awakening_permit_implies_bound γtq l deqFront n:
   own γtq (cell_list_contents_auth_ra l deqFront) -∗
@@ -999,8 +1025,8 @@ Proof.
   simpl in *. iPureIntro; lia.
 Qed.
 
-Global Instance is_thread_queue_persistent γa γ γe γd e d:
-  Persistent (is_thread_queue γa γ γe γd e d).
+Global Instance is_thread_queue_persistent γa γtq γe γd γres e d:
+  Persistent (is_thread_queue γa γtq γe γd γres e d).
 Proof. apply _. Qed.
 
 (* a.d. TODO rename *)
@@ -1066,9 +1092,9 @@ Qed.
 
 (* ENTRY POINTS TO THE CELL ****************************************************)
 
-Lemma deq_front_at_least_from_iterator_issued E' γa γtq γe γd e d i:
+Lemma deq_front_at_least_from_iterator_issued E' γa γtq γe γd γres e d i:
   ↑N ⊆ E' ->
-  is_thread_queue γa γtq γe γd e d -∗
+  is_thread_queue γa γtq γe γd γres e d -∗
   iterator_issued γd i ={E'}=∗
   deq_front_at_least γtq (S i) ∗
   iterator_issued γd i.
@@ -1078,7 +1104,7 @@ Proof.
   by iDestruct (iterator_issued_is_at_least with "HIsRes") as "$".
   rewrite awakening_permit_combine; last lia.
   iDestruct "HH" as "[>HH HHRestore]".
-  iInv NTq as (l deqFront) "(>H● & HRRs & HRest)" "HClose".
+  iInv NTq as (l deqFront) "(HResShot & >H● & HRRs & HRest)" "HClose".
   rewrite -awakening_permit_combine; last lia.
   iDestruct (awakening_permit_implies_bound with "H● HH") as "#%".
   iMod (cell_list_contents__deq_front_at_least with "H●") as "[H● $]"; first lia.
@@ -1088,10 +1114,10 @@ Proof.
   by iMod ("HHRestore" with "HH").
 Qed.
 
-Lemma inhabit_cell_spec γa γtq γe γd γk i ptr (ℓk: loc) e d:
+Lemma inhabit_cell_spec γa γtq γe γd γres γk i ptr (ℓk: loc) e d:
   {{{ callback_invariant V' γk ℓk CallbackWaiting ∗
       cell_location γtq γa i ptr ∗
-      is_thread_queue γa γtq γe γd e d ∗
+      is_thread_queue γa γtq γe γd γres e d ∗
       callback_invokation_permit γk 1%Qp ∗
       iterator_issued γe i }}}
     CAS #ptr (InjLV #()) (InjLV #ℓk)
@@ -1109,7 +1135,7 @@ Proof.
   iMod (access_iterator_resources with "HE [#]") as "HH"; first done.
   by iApply (iterator_issued_is_at_least with "HEnq").
   iDestruct "HH" as "[HH HHRestore]".
-  iInv "HInv" as (l' deqFront) "(>H● & HRRs & >HLen)" "HTqClose".
+  iInv "HInv" as (l' deqFront) "(HResShot & >H● & HRRs & >HLen)" "HTqClose".
   iDestruct (suspension_permit_implies_bound with "H● HH") as "#>HH'".
   iDestruct "HH'" as %HLength. iSpecialize ("HHRestore" with "HH").
   destruct (lookup_lt_is_Some_2 l' i) as [c HEl]; first lia.
@@ -1177,6 +1203,7 @@ Proof.
     iExists _, _. iFrame "H●". rewrite insert_length. iFrame "HLen".
     iDestruct (big_sepL_insert_acc with "HRRs") as "[HPre HRRsRestore]";
       first done.
+    iFrame.
     iApply "HRRsRestore". simpl. iFrame "HEnq".
     iNext.
     iExists _, _.
@@ -1187,8 +1214,8 @@ Proof.
 Qed.
 
 Lemma pass_value_to_empty_cell_spec
-      γtq γa γe γd i ptr e d :
-  {{{ is_thread_queue γa γtq γe γd e d ∗
+      γtq γa γe γd γres i ptr e d :
+  {{{ is_thread_queue γa γtq γe γd γres e d ∗
       cell_location γtq γa i ptr ∗
       iterator_issued γd i
       }}}
@@ -1204,7 +1231,7 @@ Proof.
     as "[#HDeqFront HIsRes]"; first done.
   wp_bind (CmpXchg _ _ _).
   iDestruct "HTq" as "(HInv & HInfArr & _ & _)".
-  iInv "HInv" as (l deqFront) "(>H● & HRRs & >HLen)" "HTqClose".
+  iInv "HInv" as (l deqFront) "(HResShot & >H● & HRRs & >HLen)" "HTqClose".
   iDestruct "HLen" as %HLen.
   iDestruct (deq_front_at_least_valid with "H● HDeqFront") as %HDeqFront.
   assert (i < length l) as HLt; first lia.
@@ -1296,7 +1323,7 @@ Proof.
     (* rewrite list_insert_insert. *)
     iMod ("HTqClose" with "[-HΦ]"); last by iModIntro; wp_pures.
     iExists _, _. iFrame "H●". rewrite insert_length.
-    iSplitL.
+    iFrame. iSplitL.
     2: iPureIntro; by lia.
     iApply "HRRsRestore". simpl. iFrame. 
     iExists _. iFrame "H↦".
@@ -1317,9 +1344,9 @@ Proof.
   done.
 Qed.
 
-Lemma acquire_resumer_resource_from_immediately_cancelled E' γtq γa γe γd i e d ℓ:
+Lemma acquire_resumer_resource_from_immediately_cancelled E' γtq γa γe γd γres i e d ℓ:
   (↑NTq ∪ ↑NArr) ⊆ E' ->
-  is_thread_queue γa γtq γe γd e d -∗
+  is_thread_queue γa γtq γe γd γres e d -∗
   deq_front_at_least γtq (S i) -∗
   cell_cancelled γa i -∗
   cell_location γtq γa i ℓ -∗
@@ -1327,7 +1354,7 @@ Lemma acquire_resumer_resource_from_immediately_cancelled E' γtq γa γe γd i 
   ▷ R.
 Proof.
   iIntros (HMask) "[#HInv _] #HDeqFront #HCancelled #H↦ HIsRes".
-  iInv "HInv" as (l deqFront) "HTq" "HClose".
+  iInv "HInv" as (l deqFront) "(HResShot & HTq)" "HClose".
   iMod (cell_cancelled_means_present with "HCancelled H↦ HTq") as
       "[HTq >HSkippable]"; first by solve_ndisj.
   iDestruct "HSkippable" as %(c & HEl & HCancelled).
@@ -1342,7 +1369,7 @@ Proof.
   iDestruct "HRR" as "(HCallback & [>HIsRes' | HR])".
   1: iDestruct (iterator_issued_exclusive with "HIsRes HIsRes'") as %[].
   iFrame "HR".
-  iMod ("HClose" with "[-]"); last done. iExists _, _. iFrame "H● HRest".
+  iMod ("HClose" with "[-]"); last done. iExists _, _. iFrame "H● HRest HResShot".
   iApply "HRRs". iFrame. iExists _, _. by iFrame.
 Qed.
 
@@ -1460,8 +1487,8 @@ Qed.
 
 (* WHOLE OPERATIONS ON THE THREAD QUEUE ****************************************)
 
-Lemma read_cell_value_by_resumer_spec γtq γa γe γd i ptr e d:
-  {{{ is_thread_queue γa γtq γe γd e d ∗
+Lemma read_cell_value_by_resumer_spec γtq γa γe γd γres i ptr e d:
+  {{{ is_thread_queue γa γtq γe γd γres e d ∗
       cell_location γtq γa i ptr ∗
       (* Needed to rule out the case of the cell being filled in multiple places. *)
       iterator_issued γd i }}}
@@ -1488,7 +1515,7 @@ Proof.
   iSpecialize ("HCloseCell" with "[HCellInit]"); first by iLeft.
   (* So we open the invariant to check how exactly it is initialized. *)
   iDestruct "HTq" as "#(HInv & HInfArr & _ & HD)".
-  iInv "HInv" as (l deqFront) "(>H● & HRRs & >HLen)" "HTqClose".
+  iInv "HInv" as (l deqFront) "(HResShot & >H● & HRRs & >HLen)" "HTqClose".
   iDestruct "HCellInit" as "[HCellInhabited|HCellFilled]".
   2: { (* Cell could not have been filled already, we hold the permit. *)
     iDestruct (rendezvous_state_included' with "H● HCellFilled")
@@ -1527,7 +1554,8 @@ Proof.
     { iRight. iLeft. by iFrame. }
     iMod ("HTqClose" with "[-HCloseCell HΦ]").
     2: iModIntro; iMod "HCloseCell"; iModIntro; iApply "HΦ".
-    iExists _, _. iNext. iFrame "H● HLen". iApply "HRRsRestore".
+    iExists _, _. iNext. iFrame "H● HLen". iFrame. iApply "HRRsRestore".
+    rewrite /cell_resources.
     iFrame. iExists _, _.
     iSplit; first done.
     by iFrame.
@@ -1545,16 +1573,16 @@ Proof.
     { repeat iRight. iExists _, _. iFrame. iSplit=>//. }
     iMod ("HTqClose" with "[-HCloseCell HΦ]").
     2: iModIntro; iMod "HCloseCell"; iModIntro; by iAssumption.
-    iExists _, _. iFrame "H● HLen". iApply "HRRsRestore".
+    iExists _, _. iFrame "H● HLen". iFrame. iApply "HRRsRestore".
     iNext.
     iFrame. iExists _, _. iFrame.
     iSplit; first done. 
     iAssumption.
 Qed.
 
-Lemma take_cell_callback_spec γtq γa γe γd γk e d i (ptr ℓk: loc):
+Lemma take_cell_callback_spec γtq γa γe γd γk γres e d i (ptr ℓk: loc):
   {{{
-    is_thread_queue γa γtq γe γd e d ∗
+    is_thread_queue γa γtq γe γd γres e d ∗
     rendezvous_thread_handle γtq γk #ℓk i ∗
     cell_location γtq γa i ptr ∗
     iterator_issued γd i
@@ -1575,7 +1603,7 @@ Proof.
   (* open invariant to read reference *)
   iDestruct "HTq" as "(HInv & HTqRest)".
   iInv "HInv" as (l deqFront) "HOpen" "HClose".
-  iDestruct "HOpen" as "(>H● & HRRs & >%)".
+  iDestruct "HOpen" as "(HResShot & >H● & HRRs & >%)".
   iDestruct (cell_list_contents_ra_locs with "H● HTh") as %(c & HEl).
   iAssert (⌜ S i ≤ deqFront ⌝)%I as %Hns.
   { by iApply (deq_front_at_least_valid with "H● HDeqFront"). }
@@ -1635,8 +1663,8 @@ Proof.
     iExists _. iFrame. by iSplit.
 Qed.
 
-Lemma resume_spec γa γtq γe γd e d:
-  {{{ is_thread_queue γa γtq γe γd e d ∗ awakening_permit γtq }}}
+Lemma resume_spec γa γtq γe γd γres e d:
+  {{{ is_thread_queue γa γtq γe γd γres e d ∗ awakening_permit γtq }}}
     resume array_interface d
   {{{ (r: bool), RET #r; if r then E else R }}}.
 Proof.
@@ -1695,7 +1723,7 @@ Proof.
       (* open invariant to read callback reference *)
       iDestruct "HTq" as "(HInv & HTqRest)".
       iInv "HInv" as (l deqFront) "HOpen" "HClose".
-      iDestruct "HOpen" as "(>H● & HRRs & >%)".
+      iDestruct "HOpen" as "(HResShot & >H● & HRRs & >%)".
       iDestruct (cell_list_contents_ra_locs with "H● HTh") as %(c & HEl).
       iDestruct (big_sepL_lookup_acc with "HRRs") as "[HRR HRRsRestore]";
         first done.
@@ -1805,9 +1833,9 @@ Proof.
     + done.
 Qed.
 
-Theorem suspend_spec γa γtq γe γd e d k:
+Theorem suspend_spec γa γtq γe γd γres e d k:
   (* the invariant about the state of CQS. *) 
-  {{{ is_thread_queue γa γtq γe γd e d ∗ 
+  {{{ is_thread_queue γa γtq γe γd γres e d ∗ 
   (* a generic permit to call suspend *)
       suspension_permit γtq ∗ 
   (* the WP of the closure k so that we can create a callback. *)
@@ -1832,7 +1860,7 @@ Proof.
     iDestruct "HEnqResult" as "(% & HIsSus & _ & #HCancelled)".
     iDestruct ("HCancelled" $! n with "[%]") as "[HNCancelled H↦]"; first lia.
     iDestruct "H↦" as (ℓ) "H↦". iDestruct "HTq" as "[HInv _]". rewrite -fupd_wp.
-    iInv "HInv" as (? ?) "HOpen" "HClose".
+    iInv "HInv" as (? ?) "(HResShot & HOpen)" "HClose".
     iMod (cell_cancelled_means_present with "HNCancelled H↦ HOpen") as "[HOpen >HPure]".
     by solve_ndisj.
     iDestruct "HPure" as %(c & HEl & HState).
@@ -1863,7 +1891,7 @@ Proof.
      we know it can only be due to a value, so we call the callback ourselves *)
   wp_pures. wp_bind (!_)%E.
   iDestruct "HResult" as "(#HFilled & HIsSus & HCallback & HInvoke)".
-  iDestruct "HTq" as "(HInv & HRest)". iInv "HInv" as (l deqFront) "HOpen" "HClose".
+  iDestruct "HTq" as "(HInv & HRest)". iInv "HInv" as (l deqFront) "(HResShot & HOpen)" "HClose".
   iApply (read_cell_value_by_suspender_spec' with "[HFilled H↦ HIsSus HOpen]").
   { iFrame. repeat iSplit. 
     iApply "HFilled". iApply "H↦". }
@@ -1877,7 +1905,7 @@ Proof.
     by done. 
     by iFrame. *)
   (* iIntros (? ?) "(HTq & -> & HEl & -> & HRR)".  *)
-  iMod ("HClose" with "[HTq]").
+  iMod ("HClose" with "[HResShot HTq]").
   { iNext. iExists _, _. iFrame. }
   iModIntro.
   (* rendezvous succeeded, we may safely leave. *)
@@ -1959,9 +1987,9 @@ Proof.
 Qed.
 
 
-Theorem try_cancel_spec γa γtq γe γd e d γk r:
+Theorem try_cancel_spec γa γtq γe γd γres e d γk r:
   (* the invariant about the state of CQS. *)
-  {{{ is_thread_queue γa γtq γe γd e d ∗ 
+  {{{ is_thread_queue γa γtq γe γd γres e d ∗ 
       is_thread_queue_suspend_result γtq γa γk r }}}
     try_cancel array_interface r
   {{{ (b: bool), RET #b; if b then 
@@ -1985,13 +2013,13 @@ Proof.
   wp_bind (!_)%E.
   (* a.d. TODO move opening the invariant into read_cell_value_by_cancelled_spec like in the other two lemmas. *)
   iDestruct "HTq" as "(HInv & HIsArray & HEnqueue & HDequeue)".
-  iInv "HInv" as (l deqFront) "HOpen" "HClose".
+  iInv "HInv" as (l deqFront) "(HResShot & HOpen)" "HClose".
   iApply (read_cell_value_by_canceller_spec with "[HOpen HCancel]").
   { iFrame. iSplit; done. }
   iNext.
   iIntros (v) "(HOpen & HResult)".
-  iMod ("HClose" with "[HOpen]").
-  { iNext. by iExists _, _. }
+  iMod ("HClose" with "[HResShot HOpen]").
+  { iNext. iExists _, _. by iFrame. }
   clear l deqFront.
   iModIntro.
   iDestruct "HResult" as "[->|(-> & % & % & HCancel)]".
@@ -2005,7 +2033,7 @@ Proof.
     rewrite bool_decide_false; last by injection.
     wp_pures.
     wp_bind (CmpXchg _ _ _).
-    iInv "HInv" as (l deqFront) "(>H● & HRRs & >HLen)" "HTqClose".
+    iInv "HInv" as (l deqFront) "(HResShot & >H● & HRRs & >HLen)" "HTqClose".
     iDestruct "HLen" as %HLen.
     iAssert (⌜∃ c : option cellTerminalState,
                   l !! i = Some (Some (cellInhabited γk k c))⌝)%I as %(c & HEl).
