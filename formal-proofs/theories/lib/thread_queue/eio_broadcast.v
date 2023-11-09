@@ -369,9 +369,7 @@ following is true:
                       asserting that the closure is safe to execute. *)
                   callback_invariant V' γk ℓk CallbackWaiting ∗
                   (* a.d. TODO I think this can just be callback_invokation_permit γk 1 *)
-                  (callback_invokation_permit γk 1%Qp ∨
-                    callback_invokation_permit γk (1/2)%Qp ∗
-                    iterator_issued γd i)
+                  callback_invokation_permit γk 1%Qp
          (* RESUMED *)
          | Some (cellResumed) =>
            (* a.d. TODO why have the disjunction? I think I should only have EIORESUMEDV *)
@@ -1189,7 +1187,7 @@ Proof.
     iSplit; first done.
     iSplit; first done.
     iFrame "HLoc Hℓ HCancHandle HF". iDestruct "HPre" as "[$ $]".
-    by iLeft.
+    by iAssumption.
 Qed.
 
 Lemma pass_value_to_empty_cell_spec
@@ -1978,8 +1976,7 @@ Proof.
     by iFrame.
   - (* Cell is inhabited *) 
     iDestruct "HRR" as "(Hℓ & HCancHandle & HE & HR & HCallback &
-      [HInvoke|[_ HC]])".
-    2: by iDestruct (iterator_issued_exclusive with "HIsRes HC") as ">[]".
+      HInvoke)".
     (* a.d. TODO here they originally split the invokation permit and replaced one half with the resume pemit.
        I want to get the resume permit back so I don't do it here. So can we remove this construction and just keep the 
        invokation permit in cell_resources. *)
@@ -2065,8 +2062,7 @@ Proof.
     iDestruct "HRR" as (??) "(>#Hℓeq & #H↦' & #HTh' & Hptr & HCancHandle & HE & HR & HCallback & HRRes)".
     iDestruct (infinite_array_mapsto_agree with "H↦ H↦'") as ">->".
     wp_cmpxchg_suc.
-    iDestruct "HRRes" as "[HInvoke|[_ HIsRes']]".
-    2: iDestruct (iterator_issued_exclusive with "HIsRes HIsRes'") as %[].
+    iDestruct "HRRes" as "HInvoke".
     (* now we need to update the logical state *)
     iMod (invokeCallback_spec with "HInvoke HCallback [HR]") as (k) "(Hk & HCallback & #HIsInvoked & #HIsCallback)".
     rewrite /V'. by iFrame.
@@ -2535,7 +2531,7 @@ Proof.
         iExists _, _. 
         iSplit; first done. 
         iFrame.
-        iSplit; first by done. iLeft. iFrame. }
+        by iAssumption. }
       iMod (immediately_cancel_cell_ra with "H●") as "[H● Hrendezvous]"; first by done.
       iMod ("HTqClose" with "[-HΦ HCancHandle HIsCallback Hk HCallbackCancelled]") as "_".
       { iExists _, _. iFrame. iNext.
