@@ -203,8 +203,9 @@ Global Instance rendezvous_state_persistent γtq i (r: cellStateR):
 Proof. apply _. Qed.
 
 (* a.d. knowledge that there is a callback k that inhabits cell i. *)
+(* a.d. TODO maybe use location directly instead of value. *)
 Definition inhabited_rendezvous_state γtq i (r: inhabitedCellStateR): iProp :=
-  ∃ γk k, rendezvous_state γtq i (Some (Cinr (to_agree (γk, k), r))).
+  ∃ γk ℓk, rendezvous_state γtq i (Some (Cinr (to_agree (γk, ℓk), r))).
 
 Global Instance inhabited_rendezvous_state_persistent γtq i r:
   CoreId r -> Persistent (inhabited_rendezvous_state γtq i r).
@@ -248,7 +249,7 @@ Definition V' (v: val): iProp := ⌜v = #()⌝ ∗ R.
   (⌜k ≠ #()⌝ ∗ ∀ v, P v -∗ WP (k v) {{_, True}}). *)
 
 (* a.d. knowledge that cell i is inhabited by callback k.
-   Because we removed future we just save the pure knowledge that k is not unit (bc it's a callback). *)
+   TODO remove *)
 Definition rendezvous_thread_handle (γtq γk: gname) (k: val) (i: nat): iProp :=
   rendezvous_thread_locs_state γtq γk k i.
 
@@ -355,7 +356,8 @@ following is true:
     iterator_issued γe i ∗ 
     ∃ (ℓ ℓk: loc), ⌜ k = #ℓk ⌝ ∗ 
       cell_location γtq γa i ℓ ∗
-      (* a.d. TODO can we remove that? *)
+      (* a.d. TODO can we remove that? 
+        No I think we need it in one case where we open the invariant and retain the knowledge that the cell is inhabited. *)
       rendezvous_thread_handle γtq γk k i ∗
          match r with
          (* CALLBACK WAITING
@@ -1193,7 +1195,6 @@ Qed.
 Lemma pass_value_to_empty_cell_spec
       γtq γa γe γd i ptr e d :
   {{{ is_thread_queue γa γtq γe γd e d ∗
-      deq_front_at_least γtq (S i) ∗
       cell_location γtq γa i ptr ∗
       iterator_issued γd i
       }}}
@@ -1204,7 +1205,9 @@ Lemma pass_value_to_empty_cell_spec
       else inhabited_rendezvous_state γtq i ε ∗ iterator_issued γd i
   }}}.
 Proof.
-  iIntros (Φ) "(#HTq & #HDeqFront & #H↦ & HIsRes) HΦ".
+  iIntros (Φ) "(#HTq & #H↦ & HIsRes) HΦ".
+  iMod (deq_front_at_least_from_iterator_issued with "[$] HIsRes")
+    as "[#HDeqFront HIsRes]"; first done.
   wp_bind (CmpXchg _ _ _).
   iDestruct "HTq" as "(HInv & HInfArr & _ & _)".
   iInv "HInv" as (l deqFront) "(>H● & HRRs & >HLen)" "HTqClose".
@@ -1292,8 +1295,7 @@ Proof.
     iMod (fill_cell_ra with "H●") as "(H● & #HInitialized)"; first done.
     iMod ("HCloseCell" with "[]") as "_"; last iModIntro.
     { iLeft. iRight. done. }
-    iSpecialize ("HΦ" $! true).
-    iSpecialize ("HΦ" with "HE").
+    iSpecialize ("HΦ" $! true with "HE").
     (* a.d. FIXME this actually seems like a bug, you don't take the value here so the internal state gets messed up. *)
     (* iMod (take_cell_value_ra with "H●") as "[H● #H◯]".
     { erewrite list_lookup_insert=> //. lia. } *)
@@ -1903,9 +1905,9 @@ Qed. *)
 (* WHOLE OPERATIONS ON THE THREAD QUEUE ****************************************)
 
 Lemma read_cell_value_by_resumer_spec γtq γa γe γd i ptr e d:
-  {{{ deq_front_at_least γtq (S i) ∗
-      is_thread_queue γa γtq γe γd e d ∗
+  {{{ is_thread_queue γa γtq γe γd e d ∗
       cell_location γtq γa i ptr ∗
+      (* Needed to rule out the case of the cell being filled in multiple places. *)
       iterator_issued γd i }}}
     !#ptr
   {{{ (v: val), RET v;
@@ -1914,24 +1916,23 @@ Lemma read_cell_value_by_resumer_spec γtq γa γe γd i ptr e d:
        ∃ γk (ℓk: loc), ⌜v = InjLV #ℓk⌝ ∧ rendezvous_thread_handle γtq γk (#ℓk) i ∗ iterator_issued γd i)
   }}}.
 Proof.
-  iIntros (Φ) "(#HDeqFront & #(HInv & HInfArr & _ & HD) & #H↦ & HIsRes) HΦ".
-  iMod (access_iterator_resources with "HD [#]") as "HH"; first done.
-  { iApply (own_mono with "HIsRes"). apply auth_included; split=>//=.
-    apply prod_included; split; first by apply ucmra_unit_least.
-    apply max_nat_included. simpl. done. }
-  iDestruct "HH" as "[HH HHRestore]".
+  iIntros (Φ) "(#HTq & #H↦ & HIsRes) HΦ".
+  rewrite -fupd_wp.
+  iMod (deq_front_at_least_from_iterator_issued with "[$] HIsRes")
+    as "[#HDeqFront HIsRes]"; first done.
+  iModIntro.
   iMod (acquire_cell _ _ _ _ _ _ with "H↦")
     as "[[#>HCellInit|[>Hℓ HCancHandle]] HCloseCell]"; first by solve_ndisj.
   2: { (* Cell was not yet inhabited, so NONEV is written in it. *)
     wp_load. iMod ("HCloseCell" with "[Hℓ HCancHandle]") as "_".
-    by iRight; iFrame. iModIntro. iMod ("HHRestore" with "HH").
+    by iRight; iFrame. iModIntro. 
     iApply "HΦ". by iLeft; iFrame.
   }
+  (* We will not change the cell status so we can pack it back up. But we keep the knowledge that the cell is initialized. *)
   iSpecialize ("HCloseCell" with "[HCellInit]"); first by iLeft.
+  (* So we open the invariant to check how exactly it is initialized. *)
+  iDestruct "HTq" as "#(HInv & HInfArr & _ & HD)".
   iInv "HInv" as (l deqFront) "(>H● & HRRs & >HLen)" "HTqClose".
-  iDestruct (awakening_permit_implies_bound with "H● HH") as "#>HValid".
-  iDestruct "HValid" as %HValid.
-  iSpecialize ("HHRestore" with "[HH]"); first done.
   iDestruct "HCellInit" as "[HCellInhabited|HCellFilled]".
   2: { (* Cell could not have been filled already, we hold the permit. *)
     iDestruct (rendezvous_state_included' with "H● HCellFilled")
@@ -1969,8 +1970,8 @@ Proof.
     wp_load.
     iSpecialize ("HΦ" $! CANCELLEDV with "[HR]").
     { iRight. iLeft. by iFrame. }
-    iMod ("HTqClose" with "[-HCloseCell HHRestore HΦ]").
-    2: iModIntro; iMod "HCloseCell"; iModIntro; iMod "HHRestore"; iApply "HΦ".
+    iMod ("HTqClose" with "[-HCloseCell HΦ]").
+    2: iModIntro; iMod "HCloseCell"; iModIntro; iApply "HΦ".
     iExists _, _. iNext. iFrame "H● HLen". iApply "HRRsRestore".
     iFrame. iExists _, _.
     iSplit; first done.
@@ -1988,8 +1989,8 @@ Proof.
     wp_load.
     iSpecialize ("HΦ" $! (InjLV _) with "[HIsRes]").
     { repeat iRight. iExists _, _. iFrame. iSplit=>//. }
-    iMod ("HTqClose" with "[-HCloseCell HHRestore HΦ]").
-    2: iModIntro; iMod "HCloseCell"; iModIntro; by iMod "HHRestore".
+    iMod ("HTqClose" with "[-HCloseCell HΦ]").
+    2: iModIntro; iMod "HCloseCell"; iModIntro; by iAssumption.
     iExists _, _. iFrame "H● HLen". iApply "HRRsRestore".
     iNext.
     iFrame. iExists _, _. iFrame.
@@ -1997,13 +1998,11 @@ Proof.
     iAssumption.
 Qed.
 
-
 Lemma take_cell_callback_spec γtq γa γe γd γk e d i (ptr ℓk: loc):
   {{{
     is_thread_queue γa γtq γe γd e d ∗
     rendezvous_thread_handle γtq γk #ℓk i ∗
     cell_location γtq γa i ptr ∗
-    deq_front_at_least γtq (S i) ∗
     iterator_issued γd i
   }}}
   CAS #ptr (InjLV #ℓk) EIORESUMEDV @ ⊤
@@ -2012,7 +2011,11 @@ Lemma take_cell_callback_spec γtq γa γe γd γk e d i (ptr ℓk: loc):
         ∃ k, is_callback γk k ∗ callback_is_invoked γk #() ∗ WP (k #()) {{r, ⌜ r = #() ⌝ }} ∗ E
       else R }}}.
 Proof.
-  iIntros (Φ) "(HTq & #HTh & #H↦ & #HDeqFront & HIsRes) HΦ".
+  iIntros (Φ) "(#HTq & #HTh & #H↦ & HIsRes) HΦ".
+  rewrite -fupd_wp.
+  iMod (deq_front_at_least_from_iterator_issued with "[$] HIsRes")
+    as "[#HDeqFront HIsRes]"; first done.
+  iModIntro.
   wp_pures.
   wp_bind (CmpXchg _ _ _).
   (* open invariant to read reference *)
@@ -2114,7 +2117,6 @@ Proof.
   wp_bind (derefCellPointer _ _). iApply derefCellPointer_spec.
   { iDestruct "HTq" as "(_ & $ & _)". iFrame "H↦~". }
   iIntros "!>" (ℓ) "#H↦". wp_pures. wp_bind (!_)%E.
-    (* a.d. TODO maybe need to return iterator issue in callback case *)
   iApply (read_cell_value_by_resumer_spec with "[$]").
   iIntros "!>" (?) "[[-> HIsSus]|[[-> HR]|HInhabited]]".
   - (* The cell is empty yet. *)
@@ -2129,8 +2131,6 @@ Proof.
     wp_pures. iApply "HΦ". by iFrame.
   - iClear "IH".
     iDestruct "HInhabited" as (γk k ->) "(#HTh & HIsRes)".
-    (* iDestruct (callback_is_loc with "[]") as "HLoc". by iDestruct "HTh" as "[$ _]". *)
-    (* iDestruct "HLoc" as %[fℓ ->]. wp_pures. *)
     wp_pures.
     wp_bind (Snd _).
     iApply (take_cell_callback_spec with "[$]").
@@ -2139,7 +2139,9 @@ Proof.
     + (* take the callback out of the cell. *)
       iDestruct "HTakeResult" as (k') "(#HIsCallback & HCallbackInvoked & Hk & HE)".
       wp_pures.  
-      (* a.d. TODO here I need to open the invariant to read again. *)
+      (* a.d. TODO here I need to open the invariant to read again.
+        I think it would be better if we just put a callback_is_invoked into the cellstate and return 
+        the whole callback_invariant above, then we don't need to open the invariant again. *)
       wp_bind (! _)%E.
       (* open invariant to read callback reference *)
       iDestruct "HTq" as "(HInv & HTqRest)".
@@ -2224,6 +2226,7 @@ Proof.
 Qed. *)
 
 Definition is_thread_queue_suspend_result γtq γa γk (r: val): iProp :=
+  (* a.d. TODO this should also directly use a location instead of a value k. *)
   ∃ k i, rendezvous_thread_handle γtq γk k i ∗
     callback_cancellation_permit γk 1%Qp ∗
     is_infinite_array_cell_pointer _ _ array_spec NArr γa r i.
@@ -2332,7 +2335,6 @@ Proof.
   { (* the cell was successfully inhabited. *)
     wp_pures. iApply "HΦ". iRight. iExists _, _. iSplitR; first done.
     iFrame.
-    rewrite /rendezvous_thread_handle /is_thread_queue_suspend_result /rendezvous_thread_handle.
     iExists _, _.
     iSplit; first done.
     by iAssumption.
@@ -2448,6 +2450,7 @@ Theorem try_cancel_spec γa γtq γe γd e d γk r:
                   (* we have a persistent piece of information that the callback is cancelled. *)
                         callback_is_cancelled γk ∗ 
                   (* is_callback allows us to conclude k = k' for k' which the function that called suspend/cancel still has. *)
+                      (* a.d. TODO could also return E here *)
                         is_callback γk k 
                   (* if cancellation fails we don't know anything (on the metalevel we know that another thread will eventually call k, but we don't have this linearity in the Iris proof yet). *)
                   else True }}}.
@@ -2460,6 +2463,7 @@ Proof.
   { iDestruct "HTq" as "(_ & $ & _)". done. }
   iIntros "!>" (ℓ) "#H↦". wp_pures. 
   wp_bind (!_)%E.
+  (* a.d. TODO move opening the invariant into read_cell_value_by_cancelled_spec like in the other two lemmas. *)
   iDestruct "HTq" as "(HInv & HIsArray & HEnqueue & HDequeue)".
   iInv "HInv" as (l deqFront) "HOpen" "HClose".
   iApply (read_cell_value_by_canceller_spec with "[HOpen HCancel]").
