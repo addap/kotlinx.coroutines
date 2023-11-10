@@ -68,6 +68,22 @@ Definition resume: val :=
   end.
 
 (* 
+  Resume_all, superficially not similar to Eio but does the same thing. 
+  Eio, does a CAS (Fst deqIterator) deqCtr endCtr and then finds all the valid cell indices between deqCtr and enqCtr.
+  We instead repeatedly call a normal resume function, which will increment deqIterator the same amount of times.
+*)
+Definition resume_all: val :=
+  λ: "enqIterator" "deqIterator",
+  (* we read the current value of enqIterator and deqIterator, take the difference and then call the normal resume function as many times.
+    This way we emulate resume_all from eio.  *)
+  let: "enqCtr" := ! (Fst "enqIterator") in
+  let: "deqCtr" := ! (Fst "deqIterator") in
+  let: "n" := "enqCtr" - "deqCtr" in
+  (rec: "loop" "n" :=
+    if: "n" = #0 then #()
+    else resume "deqIterator";; "loop" ("n" - #1)) "n".
+
+(* 
 
 *)
 Definition try_cancel: val :=
@@ -285,6 +301,12 @@ Definition suspension_permit γ := own γ (◯ (1%nat, ε, ε)).
 Definition awakening_permit γ := own γ (◯ (ε, (1%nat, ε), ε)).
 
 Definition resume_all_permit γ := own γ (resume_all_ra).
+
+Global Instance awakening_permit_Timeless γ: Timeless (awakening_permit γ).
+Proof. by apply _. Qed.
+
+Global Instance suspension_permit_Timeless γ: Timeless (suspension_permit γ).
+Proof. by apply _. Qed.
 
 Variable array_interface: infiniteArrayInterface.
 Variable array_spec: infiniteArraySpec _ array_interface.
@@ -636,6 +658,20 @@ Proof.
   iPureIntro; simpl in *; lia.
 Qed.
 
+Lemma deq_front_at_least_from_auth_ra γtq l deqFront:
+  own γtq (cell_list_contents_auth_ra l deqFront) ==∗
+  own γtq (cell_list_contents_auth_ra l deqFront) ∗
+  deq_front_at_least γtq deqFront.
+Proof.
+  iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
+  apply auth_update_core_id. by apply _.
+  apply prod_included=> /=. split; last by apply ucmra_unit_least.
+  apply prod_included=> /=. split; first by apply ucmra_unit_least.
+  apply prod_included=> /=. split; first by apply ucmra_unit_least.
+  done.
+Qed.
+
+
 Theorem cell_list_contents__deq_front_at_least i γtq l deqFront:
   (i <= deqFront)%nat ->
   own γtq (cell_list_contents_auth_ra l deqFront) ==∗
@@ -869,6 +905,30 @@ Proof.
       by apply alloc_option_local_update.
 Qed.
 
+Lemma deque_all_register_ra_update γ l n res_n:
+  (0 < res_n ≤ length l)%nat ->
+  own γ (cell_list_contents_auth_ra l 0) -∗
+  thread_queue_state γ n ==∗
+  own γ (cell_list_contents_auth_ra l res_n)
+  ∗ [∗] replicate res_n (awakening_permit γ)
+  ∗ thread_queue_state γ (n - res_n)
+  ∗ deq_front_at_least γ res_n.
+Proof.
+  intros [Hgt0 Hleql].
+  rewrite awakening_permit_combine; last by lia.
+  iIntros "H● H◯".
+  iMod (own_update_2 with "H● H◯") as "($ & $ & $ & $)"; last done.
+  apply auth_update, prod_local_update=>/=.
+  apply prod_local_update_2, prod_local_update=>/=.
+  - rewrite ucmra_unit_right_id. by apply nat_local_update.
+  - apply max_nat_local_update; simpl; lia.
+  - apply prod_local_update_2. rewrite ucmra_unit_right_id=>/=.
+    apply local_update_total_valid=> _ _. rewrite Excl_included=> ->.
+    etransitivity. by apply delete_option_local_update, _.
+    rewrite !drop_length.
+      by apply alloc_option_local_update.
+Qed.
+
 Lemma find_drop_lt {A} (l: list A) j i:
   find_index (λ _, True) (drop j l) = Some i → j < length l.
 Proof.
@@ -919,6 +979,27 @@ Proof.
     rewrite !bool_decide_false; first done; lia.
 Qed.
 
+Lemma advance_deqFront_all res_n l γtq γa γe γd:
+  res_n < length l ->
+  □ ▷ R -∗
+  ▷ ([∗ list] k ↦ y ∈ l, cell_resources γtq γa γe γd k y
+                                        (bool_decide (k < 0))) -∗
+  ▷ ([∗ list] k ↦ y ∈ l, cell_resources γtq γa γe γd k y
+                                        (bool_decide (k < S res_n))).
+Proof.
+  iInduction res_n as [|res_n] "IH".
+  - iIntros (Hlen) "#HR HRRs". 
+    iApply (advance_deqFront 0).
+    lia. iAssumption. iAssumption.
+  - iIntros (Hlen) "#HR HRRs".
+    assert (res_n < length l) by lia.
+    iSpecialize ("IH" $! H3 with "HR HRRs").
+    iPoseProof (advance_deqFront (S res_n) with "HR IH") as "H".
+    lia.
+    rewrite Nat.add_1_r.
+    iAssumption.
+Qed.
+
 (* Lemma advance_deqFront_pure deqFront l:
   deqFront < length l ->
    ∧ (S deqFront > 0
@@ -964,6 +1045,36 @@ Proof.
   iPureIntro. by lia.
 Qed.
 
+Lemma thread_queue_register_for_dequeue_all γtq γa γe γd l n res_n:
+  res_n ≤ length l →
+  □ ▷ R -∗ ▷ thread_queue_invariant γa γtq γe γd l 0 -∗
+  ▷ thread_queue_state γtq n ==∗
+  ▷ ([∗] replicate res_n (awakening_permit γtq)
+  ∗ deq_front_at_least γtq res_n
+  ∗ thread_queue_invariant γa γtq γe γd l res_n
+  ∗ thread_queue_state γtq (n - res_n)).
+Proof.
+  destruct res_n as [|res_n].
+  - iIntros (Hleq) "#HR (>H● & HRRs & _) >H◯".
+    iMod (deq_front_at_least_from_auth_ra with "H●") as "[H● HDeqFront]".
+    iModIntro. iNext.
+    iFrame.
+    iSplit; first done.
+    iSplit; first by iPureIntro; lia.
+    rewrite Nat.sub_0_r.
+    by iAssumption.
+  - iIntros (Hleq) "#HR (>H● & HRRs & _) >H◯".
+    iMod (deque_all_register_ra_update with "H● H◯")
+      as "($ & HAwaks & H◯ & $)".
+    { split. lia. lia. }
+    iFrame.
+    iModIntro.
+    iSplit; last by iPureIntro; lia.
+    iApply (advance_deqFront_all with "HR HRRs").
+    by lia.
+Qed.
+
+
 (* a.d. Dequeue registration If it is known that the size is nonzero, it is possible to decrease the size and provide an R,
 obtaining in exchange an awakening permit — a permission to call resume(v). *)
 (* Theorem thread_queue_register_for_dequeue' E' γtq γa γe γd γres n e d:
@@ -987,15 +1098,43 @@ Proof.
   iExists _, _. iFrame.
 Qed. *)
 
+Lemma resume_all_permit_exclusive γres:
+  resume_all_permit γres -∗ resume_all_permit γres -∗ False.
+Proof.
+  (* exclusive_r *)
+  iIntros "H1 H2".
+  iDestruct (own_valid_2 with "H1 H2") as "%".
+  iPureIntro.
+  apply (exclusive_r _ _ H3).
+Qed.
+
 (* new theorem to change thread queue state and dequeue everything. *)
-(* Theorem thread_queue_register_for_dequeue_all E' γtq γa γe γd n e d:
-  ↑NTq ⊆ E' ->
+Theorem thread_queue_register_for_dequeue_all' E' γtq γa γe γd γres n res_n e d:
+  ↑NTq ⊆ E' →
+  res_n ≤ n →
+  resume_all_permit γres -∗
   is_thread_queue γa γtq γe γd γres e d -∗
   □ ▷ R -∗ ▷ thread_queue_state γtq n ={E'}=∗
-  thread_queue_state γtq 0 ∗ ([∗] replicate n (awakening_permit γtq)).
+  thread_queue_state γtq (n - res_n) ∗ (▷ [∗] replicate res_n (awakening_permit γtq)).
 Proof.
-  (* a.d. TODO should be doable by simple induction on n *)
-Admitted. *)
+  iIntros (HMask Hn) "HResShot [#HInv _] HR >HState".
+  iInv "HInv" as (l deqFront) "(>[->|HResShot'] & HOpen)" "HClose".
+  2: { iDestruct (resume_all_permit_exclusive with "HResShot HResShot'") as %[]. }
+  (* iAssert (▷⌜deqFront < length l⌝)%I with "[-]" as "#>HLen".
+  { iDestruct "HOpen" as "(>H● & _)".
+    iDestruct (thread_queue_state_valid with "H● HState") as %->.
+    rewrite drop_length in Hn.
+    iPureIntro. lia. }
+  iDestruct "HLen" as %HLen. *)
+  iAssert (▷ ⌜ n = length l ⌝)%I with "[#]" as ">->".
+  { iNext.
+    iDestruct "HOpen" as "(H● & _)". iApply (thread_queue_state_valid with "H● HState"). }
+  iMod (thread_queue_register_for_dequeue_all with "HR HOpen HState")
+       as "(HAwaks & _ & HOpen & >HState)"=> //.
+  iFrame. iMod ("HClose" with "[HResShot HOpen]") as "_".
+  { iExists _, _. iFrame. }
+  by iModIntro.
+Qed.
 
 Lemma awakening_permit_implies_bound γtq l deqFront n:
   own γtq (cell_list_contents_auth_ra l deqFront) -∗
@@ -1329,19 +1468,6 @@ Proof.
     iExists _. iFrame "H↦".
     iNext.
     by iFrame.
-Qed.
-
-Lemma deq_front_at_least_from_auth_ra γtq l deqFront:
-  own γtq (cell_list_contents_auth_ra l deqFront) ==∗
-  own γtq (cell_list_contents_auth_ra l deqFront) ∗
-  deq_front_at_least γtq deqFront.
-Proof.
-  iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
-  apply auth_update_core_id. by apply _.
-  apply prod_included=> /=. split; last by apply ucmra_unit_least.
-  apply prod_included=> /=. split; first by apply ucmra_unit_least.
-  apply prod_included=> /=. split; first by apply ucmra_unit_least.
-  done.
 Qed.
 
 Lemma acquire_resumer_resource_from_immediately_cancelled E' γtq γa γe γd γres i e d ℓ:
@@ -1772,6 +1898,115 @@ Proof.
     + wp_pures. iApply "HΦ". by iFrame.
 Qed.
 
+Lemma resume_all_loop_spec γa γtq γe γd γres e d n:
+  {{{ 
+    is_thread_queue γa γtq γe γd γres e d ∗
+    [∗] replicate n (awakening_permit γtq)
+  }}}
+  (rec: "loop" "n" :=
+    if: "n" = #0 then #()
+    else resume array_interface d;; "loop" ("n" - #1))%V #n
+  {{{ RET #(); True }}}.
+Proof.
+  iIntros (Φ) "(#HTq & HAwaks) HΦ".  
+  iInduction n as [|n'] "IH".
+  - wp_pures. by iApply "HΦ".
+  - wp_pures.
+    rewrite replicate_S.
+    rewrite big_sepL_cons.
+    iDestruct "HAwaks" as "(HAwak & HAwaks)".
+    wp_bind (resume _ _).
+    iApply (resume_spec with "[$]").
+    iIntros "!>" (?) "_".
+    do 3 wp_pure _.
+    replace (Z.sub (S n') 1) with (Z.of_nat n'); last by lia.
+    iApply ("IH" with "HAwaks HΦ").
+Qed.
+
+Lemma resume_all_spec γa γtq γe γd γres e d n:
+  NTq ## NDeq →
+  NTq ## NEnq →
+  {{{
+    is_thread_queue γa γtq γe γd γres e d ∗
+    □ ▷ R ∗
+    resume_all_permit γres ∗
+    thread_queue_state γtq n
+  }}}
+    resume_all array_interface e d
+  {{{ RET #(); True }}}.
+Proof.
+  iIntros (HDisj1 HDisj2 Φ) "(#HTq & #HR & HResShot & HState) HΦ".
+  iAssert (is_thread_queue γa γtq γe γd γres e d)%I with "HTq" as "#HTq'".
+  iDestruct "HTq'" as "(HInv & HArray & HEnq & HDeq)".
+  wp_lam. wp_pures.
+  rewrite /is_iterator.
+  (* read from enqueue iterator *)
+  wp_bind (! _)%E.
+  iDestruct "HEnq" as (ℓe pe) "(-> & HeInv)".
+  wp_pures.
+  iInv "HeInv" as (enqCtr) "HOpen" "HClose".
+  rewrite /iterator_contents /iterator_counter.
+  iDestruct "HOpen" as "((Hℓe & Hcounter) & HOpen)". 
+  wp_load.
+  iMod (iterator_counter_is_at_least with "Hcounter") as "(Hcounter & #HeAtLeast)".
+  iMod ("HClose" with "[Hℓe Hcounter HOpen]") as "_".
+  { iExists _. iFrame. }
+  iModIntro.
+  wp_pures.
+  (* read from dequeue iterator *)
+  wp_bind (! _)%E.
+  iDestruct "HDeq" as (ℓd pd) "(-> & HdInv)".
+  wp_pures.
+  iInv "HdInv" as (deqCtr) "HOpen" "HClose".
+  rewrite /iterator_contents /iterator_counter.
+  iDestruct "HOpen" as "((Hℓd & Hcounter) & HOpen)". 
+  wp_load.
+  iMod (iterator_counter_is_at_least with "Hcounter") as "(Hcounter & #HdAtLeast)".
+  iMod ("HClose" with "[Hℓd Hcounter HOpen]") as "_".
+  { iExists _. iFrame. }
+  iModIntro.
+  do 2 wp_pure _.
+  wp_bind (_ - _)%E.
+  (* open thread queue invariant to know its size. *)
+  iInv "HInv" as (l deqFront) "(>[-> | HResShot'] & HOpen)" "HClose". 
+  2: { iDestruct (resume_all_permit_exclusive with "HResShot HResShot'") as %[]. }
+  iDestruct "HOpen" as "(>H● & HRRs & >%)".
+  iMod (access_iterator_resources _ _ _  NEnq with "[HeInv] HeAtLeast") as "(HRes & HResRestore)";
+    first by solve_ndisj. 
+  { iExists _, _. iSplit; first done. iAssumption. }
+  iAssert (▷ ⌜ enqCtr ≤ length l ⌝)%I with "[#]" as ">%".
+  { iNext. iApply (suspension_permit_implies_bound with "H● HRes"). }
+  iMod ("HResRestore" with "HRes") as "_".
+  iMod (access_iterator_resources _ _ _  NDeq with "[HdInv] HdAtLeast") as "(HRes & HResRestore)";
+    first by solve_ndisj. 
+  { iExists _, _. iSplit; first done. iAssumption. }
+  iAssert (▷ ⌜ deqCtr ≤ 0 ⌝)%I with "[#]" as ">%".
+  { iNext. iApply (awakening_permit_implies_bound with "H● HRes"). }
+  iMod ("HResRestore" with "HRes") as "_".
+  iDestruct (thread_queue_state_valid with "H● HState") as %Hn.
+  rewrite drop_length in Hn. rewrite Nat.sub_0_r in Hn.
+  assert (HdeqCtr: deqCtr = 0) by lia.
+  iMod ("HClose" with "[H● HRRs]") as "_".
+  { iExists _, 0. iSplitR; first by iLeft.
+    iNext. iFrame. iPureIntro. lia. }
+  (* take awakening permits *)
+  rewrite -fupd_wp.
+  iMod (thread_queue_register_for_dequeue_all' _ γtq γa γe γd γres _ enqCtr with "HResShot HTq HR HState") as "(HState & HAwaks)"; 
+    first by solve_ndisj.
+  by lia.
+  iModIntro.
+  simplify_eq.
+  wp_pure _.
+  iApply fupd_intro_mask; first by solve_ndisj.
+  iApply fupd_intro_mask; first by solve_ndisj.
+  iApply fupd_intro_mask; first by solve_ndisj.
+  replace (Z.sub enqCtr O) with (Z.of_nat enqCtr) by lia.
+  do 3 wp_pure _.
+  iApply (resume_all_loop_spec with "[HAwaks]").
+  { by iFrame. }
+  iNext.
+  by iAssumption.
+Qed.
 
 Definition is_thread_queue_suspend_result γtq γa γk (r: val): iProp :=
   (* a.d. TODO this should also directly use a location instead of a value k. *)
@@ -2108,7 +2343,7 @@ Qed.
 End proof.
 
 Print Assumptions suspend_spec.
-Print Assumptions resume_spec.
+Print Assumptions resume_all_spec.
 Print Assumptions try_cancel_spec.
 
 Typeclasses Opaque inhabited_rendezvous_state
