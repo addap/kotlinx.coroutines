@@ -3,6 +3,7 @@ From SegmentQueue.lib.concurrent_linked_list.infinite_array
 From SegmentQueue.util Require Import big_opL everything.
 From SegmentQueue.lib.util Require Import increaseValueTo.
 
+
 Section impl.
 
 Variable (array_interface: infiniteArrayInterface).
@@ -13,12 +14,17 @@ Definition iteratorStep: val :=
   let: "ptr" := Snd "iterator" in
   let: "start" := cutoffGetPointer array_interface "ptr" in
   let: "idx" := FAA "counter" #1%nat in
+  (* idx: the idx of the cell
+     findCellAndMoveForward: is something like an abstract cell pointer.
+        The cell's index can be computed from it via cellPointerId 
+        A cell can be cancelled by it.   *)
   ("idx", findCellAndMoveForward array_interface "ptr" "idx" "start").
 
 Definition iteratorStepOrIncreaseCounter: val :=
   λ: "shouldAdjust" "iterator",
   let: "counter" := Fst "iterator" in
   let: "s" := iteratorStep "iterator" in
+  (* TODO when is the cell idx not the same as the cellPointerId? Probably something to do with cancellation. *)
   if: cellPointerId array_interface (Snd "s") = (Fst "s") then SOME (Snd "s")
   else (if: "shouldAdjust"
         then increaseValueTo "counter" (cellPointerId array_interface (Snd "s"))

@@ -274,7 +274,9 @@ Definition V' (v: val): iProp := ⌜v = #()⌝ ∗ R.
   (⌜k ≠ #()⌝ ∗ ∀ v, P v -∗ WP (k v) {{_, True}}). *)
 
 (* a.d. knowledge that cell i is inhabited by callback k.
-   TODO remove *)
+   TODO remove 
+   or rename put is_callback in here to make it in 
+   line with original thread_handle *)
 Definition rendezvous_thread_handle (γtq γk: gname) (k: val) (i: nat): iProp :=
   rendezvous_thread_locs_state γtq γk k i.
 
@@ -878,6 +880,7 @@ Qed.
 
 (* a.d. why i and S i? 
 This seems to say: register i dequeue operations. But not sure why we get S i awakening permits in the end.
+DONE: No it says register S i dequeue operations. It just doesn't make any sense to register 0.
 *)
 Lemma deque_register_ra_update γ l deqFront i n:
   (i + deqFront < length l)%nat ->
@@ -2016,6 +2019,7 @@ Definition is_thread_queue_suspend_result γtq γa γk (r: val) k: iProp :=
   ∃ ℓk i, rendezvous_thread_handle γtq γk ℓk i ∗
     is_callback γk k ∗
     callback_cancellation_permit γk 1%Qp ∗
+    (* TODO why do we have this? *)
     is_infinite_array_cell_pointer _ _ array_spec NArr γa r i.
 
 Lemma read_cell_value_by_suspender_spec' γtq γa γe γd i (ptr: loc) l deqFront Mask:
