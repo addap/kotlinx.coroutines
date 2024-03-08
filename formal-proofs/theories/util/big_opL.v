@@ -139,6 +139,7 @@ Proof.
 Qed.
 
 From iris.algebra Require Import cmra gset numbers.
+From iris.staging.algebra Require Import list.
 
 Lemma big_opL_op_prodR r (A B : ucmra) (C : Type)
       (f : nat → C → A) (g : nat → C → B) (l : list C):
@@ -155,6 +156,9 @@ Lemma big_opL_op_ucmra_unit (A: ucmra) (C : Type) (l : list C):
   ([^op list] _ ∈ l, (ε: A)) ≡ ε.
 Proof. induction l=>//=. rewrite IHl ucmra_unit_left_id //. Qed.
 
+(* a.d. TODO I had to add this local hint for typeclass resolution to work.
+   This was used in old iris, new iris uses (refine (ofe_equiv _)) which somehow fails. *)
+Local Hint Extern 0 (Equiv _) => eapply (@ofe_equiv _) : typeclass_instances.
 Lemma big_opL_op_gset n m:
   GSet (set_seq n m) ≡ [^op list] x ∈ seq n m, GSet {[x]}.
 Proof.

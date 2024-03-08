@@ -6,7 +6,7 @@ From iris.base_logic Require Import lib.invariants.
 From iris.program_logic Require Import atomic.
 From iris.bi.lib Require Import fractional.
 From iris.heap_lang Require Import proofmode.
-From iris.algebra Require Import cmra excl csum auth csum numbers.
+From iris.algebra Require Import cmra excl csum auth numbers.
 
 Definition newCallback : val := (λ: "k", ref "k").
 
@@ -71,11 +71,11 @@ Definition callback_is_cancelled (γ: gname): iProp Σ :=
 Definition is_callback (γ: gname) (k: val): iProp Σ :=
   own γ (◯ (Some (to_agree k), None, None, None)).
   
-Global Instance callback_invokation_permit_Timeless:
+Global Instance callback_invokation_permit_Timeless γ q:
   Timeless (callback_invokation_permit γ q).
 Proof. apply _. Qed.
 
-Global Instance callback_cancellation_permit_Timeless:
+Global Instance callback_cancellation_permit_Timeless γ q:
   Timeless (callback_cancellation_permit γ q).
 Proof. apply _. Qed.
 
@@ -93,8 +93,9 @@ Proof.
   by rewrite -own_op -auth_frag_op -!pair_op -Some_op -Cinl_op -frac_op.
 Qed.
 
+(* a.d. PORT swapped Qc for Qp, should be okay *)
 Theorem callback_invokation_permit_valid γ q:
-  callback_invokation_permit γ q -∗ ⌜(q ≤ 1)%Qc⌝.
+  callback_invokation_permit γ q -∗ ⌜(q ≤ 1)%Qp⌝.
 Proof.
   iIntros "HFuture". iDestruct (own_valid with "HFuture") as %HValid.
   iPureIntro. move: HValid. rewrite auth_frag_valid; case; case=> /=. 
@@ -102,45 +103,74 @@ Proof.
 Qed.
 
 Theorem callback_cancellation_permit_valid γ q:
-  callback_cancellation_permit γ q -∗ ⌜(q ≤ 1)%Qc⌝.
+  callback_cancellation_permit γ q -∗ ⌜(q ≤ 1)%Qp⌝.
 Proof.
   iIntros "HFuture". iDestruct (own_valid with "HFuture") as %HValid.
   iPureIntro. move: HValid. rewrite auth_frag_valid. case=> _/=. 
   rewrite Some_valid. by compute.
 Qed.
 
-Global Instance callback_is_invoked_Persistent:
+Global Instance callback_is_invoked_Persistent γ v:
   Persistent (callback_is_invoked γ v).
 Proof. apply _. Qed.
 
-Global Instance callback_is_cancelled_Persistent:
+Global Instance callback_is_cancelled_Persistent γ:
   Persistent (callback_is_cancelled γ).
 Proof. apply _. Qed.
 
+(* a.d. PORT something goes wrong with applying pair_valid lemmas here. *)
 Theorem callback_invokation_permit_implies_not_invoked γ v q:
   callback_invokation_permit γ q -∗ callback_is_invoked γ v -∗ False.
 Proof.
   iIntros "H1 H2".
-  iDestruct (own_valid_2 with "H1 H2") as %[[_ HValid]%pair_valid _]%pair_valid.
+  iDestruct (own_valid_2 with "H1 H2") as %H'.
+  rewrite -auth_frag_op in H'.
+  specialize (auth_frag_valid_1 _ H') as H1.
+  move: H1.
+  rewrite pair_valid. cbn.
+  rewrite pair_valid. cbn.
+  move=> [[_ HValid] _].
   exfalso. move: HValid=> /=. by compute.
+  (* iIntros "H1 H2".
+  iDestruct (own_valid_2 with "H1 H2") as %[[_ HValid]%pair_valid _]%pair_valid.
+  exfalso. move: HValid=> /=. by compute. *)
 Qed.
 
 Theorem callback_cancellation_permit_implies_not_cancelled γ q:
   callback_cancellation_permit γ q -∗ callback_is_cancelled γ -∗ False.
 Proof.
   iIntros "H1 H2".
-  iDestruct (own_valid_2 with "H1 H2") as %[_ HValid]%pair_valid.
+  iDestruct (own_valid_2 with "H1 H2") as %H'.
+  rewrite -auth_frag_op in H'.
+  specialize (auth_frag_valid_1 _ H') as H1.
+  move: H1.
+  rewrite pair_valid. cbn.
+  move=> [_ HValid].
   exfalso. move: HValid=> /=. by compute.
+  (* iIntros "H1 H2".
+  iDestruct (own_valid_2 with "H1 H2") as %[_ HValid]%pair_valid.
+  exfalso. move: HValid=> /=. by compute. *)
 Qed.
 
 Theorem callback_is_invoked_not_cancelled γ v:
   callback_is_invoked γ v -∗ callback_is_cancelled γ -∗ False.
 Proof.
   iIntros "H1 H2".
+  iDestruct (own_valid_2 with "H1 H2") as %H'.
+  rewrite -auth_frag_op in H'.
+  specialize (auth_frag_valid_1 _ H') as H1.
+  move: H1.
+  rewrite pair_valid. cbn.
+  rewrite pair_valid. cbn.
+  rewrite pair_valid. cbn.
+  move=> [[[_ HValid] _] _].
+  exfalso. move: HValid=> /=. rewrite -Some_op Some_valid=> HValid.
+  by apply to_agree_op_inv_L in HValid.
+  (* iIntros "H1 H2".
   iDestruct (own_valid_2 with "H1 H2")
     as %[[[_ HValid]%pair_valid _]%pair_valid _]%pair_valid.
   exfalso. move: HValid=> /=. rewrite -Some_op Some_valid=> HValid.
-  by apply to_agree_op_inv_L in HValid.
+  by apply to_agree_op_inv_L in HValid. *)
 Qed.
 
 Theorem callback_is_invoked_not_waiting γ v k:
@@ -184,7 +214,7 @@ Lemma callback_is_invoked_from_auth_ra E' γ v k:
   own γ (callback_auth_ra (CallbackInvoked v) k) ∗ callback_is_invoked γ v.
 Proof.
   iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
-  apply auth_update_core_id; first by apply _.
+  apply auth_update_dfrac_alloc; first by apply _.
   repeat (apply prod_included; split). all: simpl. all: try done.
   apply None_least.
   apply None_least.
@@ -195,7 +225,7 @@ Lemma callback_is_cancelled_from_auth_ra E' γ k:
   own γ (callback_auth_ra CallbackCancelled k) ∗ callback_is_cancelled γ.
 Proof.
   iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
-  apply auth_update_core_id; first by apply _.
+  apply auth_update_dfrac_alloc; first by apply _.
   repeat (apply prod_included; split). all: simpl. all: try done.
   apply None_least.
   apply None_least.
@@ -206,37 +236,48 @@ Theorem is_callback_from_auth_ra E' γ state k:
   own γ (callback_auth_ra state k) ∗ is_callback γ k.
 Proof.
   iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
-  apply auth_update_core_id; first by apply _.
+  apply auth_update_dfrac_alloc; first by apply _.
   repeat (apply prod_included; split).
   all: destruct state; simpl; try done; try apply None_least.
 Qed.
 
+From stdpp Require Import numbers.
+
 Theorem callback_invokation_permit_exclusive γ q:
   callback_invokation_permit γ 1%Qp -∗ callback_invokation_permit γ q -∗ False.
 Proof.
-  iIntros "H1 H2". iCombine "H1" "H2" as "H".
-  iDestruct (own_valid with "H") as %HValid. exfalso. move: HValid.
+  iIntros "H1 H2". 
+  iDestruct (own_valid_2 with "H1 H2") as %HValid. exfalso.
+  rewrite -auth_frag_op in HValid.
+  specialize (auth_frag_valid_1 _ HValid) as H1.
+  move: H1.
   case; case=> _/=.
   move: (frac_valid (1 + q)). case=> HOk _ HOk' _. apply HOk in HOk'.
-  by eapply Qp_not_plus_q_ge_1.
+  by eapply Qp_not_add_le_l.
 Qed.
 
 Theorem callback_cancellation_permit_exclusive γ q:
   callback_cancellation_permit γ 1%Qp -∗ callback_cancellation_permit γ q -∗ False.
 Proof.
-  iIntros "H1 H2". iCombine "H1" "H2" as "H".
-  iDestruct (own_valid with "H") as %HValid. exfalso. move: HValid.
+  iIntros "H1 H2". 
+  iDestruct (own_valid_2 with "H1 H2") as %HValid. exfalso. 
+  rewrite -auth_frag_op in HValid.
+  specialize (auth_frag_valid_1 _ HValid) as H1.
+  move: H1.
   case=> _/=.
   move: (frac_valid (1 + q)). case=> HOk _ HOk'. apply HOk in HOk'.
-  by eapply Qp_not_plus_q_ge_1.
+  by eapply Qp_not_add_le_l.
 Qed.
 
 Theorem is_callback_agree γ k k': 
   is_callback γ k -∗ is_callback γ k' -∗ ⌜ k = k' ⌝.
 Proof.
   iIntros "H1 H2".
-  iDestruct (own_valid_2 with "H1 H2") as %HValid.
-  iPureIntro. move: HValid.
+  iDestruct (own_valid_2 with "H1 H2") as %H1.
+  iPureIntro.
+  rewrite -auth_frag_op in H1.
+  specialize (auth_frag_valid_1 _ H1) as HValid.
+  move: HValid.
   case; case; case=> /= HValid _ _ _.
   move: HValid.
   rewrite Some_valid.

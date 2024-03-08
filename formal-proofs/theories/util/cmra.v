@@ -1,5 +1,7 @@
 From iris.algebra Require Import cmra list.
+From iris.staging.algebra Require Import list.
 
+(* list_op is now in iris_staging *)
 Lemma replicate_op {A: ucmra} (a b: A) n:
   replicate n (a ⋅ b) = replicate n a ⋅ replicate n b.
 Proof. apply list_eq. induction n; simpl. done. case; done. Qed.
@@ -36,6 +38,7 @@ Proof.
   apply prod_included'' in HEv.
   by simpl in *.
 Qed.
+
 
 Lemma list_validN_app {A: ucmra} (x y : list A) (n: nat):
   ✓{n} (x ++ y) <-> ✓{n} x ∧ ✓{n} y.

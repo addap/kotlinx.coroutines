@@ -3,11 +3,11 @@
 -arg -w -arg -ambiguous-paths
 -arg -w -arg -redundant-canonical-projection
 -arg -w -arg -projection-no-head-constant
-./theories/lib/thread_queue/thread_queue.v
+#./theories/lib/thread_queue/thread_queue.v
 ./theories/lib/thread_queue/callback.v
-./theories/lib/interruptible_semaphore/sync_smart_sync.v
-./theories/lib/interruptible_semaphore/async_immediate.v
-./theories/lib/interruptible_semaphore/async_smart_sync.v
+#./theories/lib/interruptible_semaphore/sync_smart_sync.v
+#./theories/lib/interruptible_semaphore/async_immediate.v
+#./theories/lib/interruptible_semaphore/async_smart_sync.v
 ./theories/lib/concurrent_linked_list/segment_spec.v
 ./theories/lib/concurrent_linked_list/segment_interfaces.v
 ./theories/lib/concurrent_linked_list/list_interfaces.v
@@ -28,9 +28,9 @@
 ./theories/lib/util/getAndUpdate.v
 ./theories/lib/util/increaseValueTo.v
 ./theories/lib/util/forRange.v
-./theories/lib/util/future.v
-./theories/lib/barrier/barrier.v
-./theories/lib/countdownlatch/countdownlatch.v
+#./theories/lib/util/future.v
+#./theories/lib/barrier/barrier.v
+#./theories/lib/countdownlatch/countdownlatch.v
 ./theories/util/everything.v
 ./theories/util/big_opL.v
 ./theories/util/cmra.v

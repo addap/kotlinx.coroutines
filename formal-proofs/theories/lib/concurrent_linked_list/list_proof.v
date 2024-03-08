@@ -1,5 +1,6 @@
 From iris.program_logic Require Import atomic.
 From iris.algebra Require Import cmra auth list agree csum numbers.
+From iris.staging.algebra Require Import list.
 From iris.base_logic Require Import lib.invariants.
 From SegmentQueue.lib.concurrent_linked_list
      Require Export segment_spec list_spec list_impl.

@@ -27,7 +27,7 @@ Proof.
   iIntros "#HCond" (Φ) "AU". iLöb as "IH". wp_lam. wp_pures.
   wp_bind (!_)%E. iMod "AU" as (k) "[Hℓ HClose]".
   wp_load.
-  destruct (pred k) eqn:E; wp_pures.
+  destruct (pred k) eqn:E. 
   - iDestruct "HClose" as "[HClose _]".
     iMod ("HClose" with "Hℓ") as "AU". iModIntro. wp_pures.
     wp_apply ("HCond" with "[$]"). iIntros (_).

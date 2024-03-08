@@ -1,4 +1,5 @@
 From iris.algebra Require Import cmra auth list agree csum excl gset frac numbers.
+From iris.staging.algebra Require Import list.
 From SegmentQueue.util Require Import cmra.
 
 Lemma list_lookup_local_update {A: ucmra}:
