@@ -18,3 +18,4 @@ Makefile.coq
 Makefile.coq.conf
 *.crashcoqide
 .env
+_opam
