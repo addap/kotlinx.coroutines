@@ -1,6 +1,6 @@
 From iris.heap_lang Require Import proofmode.
 
-Lemma big_opL_forall' {M: ofeT} {o: M -> M -> M} {H': Monoid o} {A B: Type}
+Lemma big_opL_forall' {M: ofe} {o: M -> M -> M} {H': Monoid o} {A B: Type}
       R f g (l: list A) (l': list B):
   Reflexive R ->
   Proper (R ==> R ==> R) o ->
@@ -42,7 +42,7 @@ Proof.
   by iFrame.
 Qed.
 
-Lemma big_opL_irrelevant_element (M: ofeT) (o: M -> M -> M) (H': Monoid o)
+Lemma big_opL_irrelevant_element (M: ofe) (o: M -> M -> M) (H': Monoid o)
       {A: Type} n (P: nat -> M) (l: list A):
   ([^o list] i ↦ _ ∈ l, P (n+i)%nat)%I =
   ([^o list] i ∈ seq n (length l), P i%nat)%I.
@@ -58,7 +58,7 @@ Proof.
 Qed.
 
 Lemma big_opL_replicate_irrelevant_element
-      (M: ofeT) (o: M -> M -> M) (H': Monoid o)
+      (M: ofe) (o: M -> M -> M) (H': Monoid o)
       {A: Type} (P: nat -> A -> M) (a: A) n:
   ([^o list] i ↦ k ∈ replicate n a, P i k)%I =
   ([^o list] i ↦ _ ∈ replicate n a, P i a)%I.
@@ -68,12 +68,12 @@ Proof.
 Qed.
 
 Lemma big_opL_irrelevant_element'
-      (M: ofeT) (o: M -> M -> M) (H': Monoid o)
+      (M: ofe) (o: M -> M -> M) (H': Monoid o)
       {A: Type} (P: nat -> M) (l: list A):
   ([^o list] i ↦ k ∈ l, P i)%I = ([^o list] i ∈ seq 0 (length l), P i%nat)%I.
 Proof. by rewrite -big_opL_irrelevant_element. Qed.
 
-Lemma big_opL_take_drop_middle (M: ofeT) (o : M → M → M) (H': Monoid o) (A: Type)
+Lemma big_opL_take_drop_middle (M: ofe) (o : M → M → M) (H': Monoid o) (A: Type)
       (f: nat → A → M) (l: list A) (id: nat) (x: A):
   l !! id = Some x →
   ([^o list] k ↦ y ∈ l, f k y) ≡
@@ -140,7 +140,7 @@ Qed.
 
 From iris.algebra Require Import cmra gset numbers.
 
-Lemma big_opL_op_prodR r (A B : ucmraT) (C : Type)
+Lemma big_opL_op_prodR r (A B : ucmra) (C : Type)
       (f : nat → C → A) (g : nat → C → B) (l : list C):
   ([^op list] k↦x ∈ l, ((f (r + k) x, g (r + k) x) : prodR A B)) ≡
   (([^op list] k↦x ∈ l, f (r + k) x), ([^op list] k↦x ∈ l, g (r + k) x)).
@@ -151,7 +151,7 @@ Proof.
   by rewrite Nat.add_0_r pair_op (IHl' (S r)).
 Qed.
 
-Lemma big_opL_op_ucmra_unit (A: ucmraT) (C : Type) (l : list C):
+Lemma big_opL_op_ucmra_unit (A: ucmra) (C : Type) (l : list C):
   ([^op list] _ ∈ l, (ε: A)) ≡ ε.
 Proof. induction l=>//=. rewrite IHl ucmra_unit_left_id //. Qed.
 
@@ -159,7 +159,7 @@ Lemma big_opL_op_gset n m:
   GSet (set_seq n m) ≡ [^op list] x ∈ seq n m, GSet {[x]}.
 Proof.
   move: m n. elim=> //= m IHm n. rewrite -(IHm (S n)).
-  rewrite -gset_op_union gset_disj_union //=.
+  rewrite -gset_op gset_disj_union //=.
   apply set_seq_S_start_disjoint.
 Qed.
 
@@ -175,7 +175,7 @@ Global Instance max_nat_homomorphism:
 Proof.
   econstructor; last done.
   econstructor; try apply _.
-  intros. by rewrite max_nat_op_max.
+  intros. by rewrite max_nat_op.
 Qed.
 
 Lemma big_opL_op_max_nat {A: Type} (f: nat → A -> max_natR) (l: list A):

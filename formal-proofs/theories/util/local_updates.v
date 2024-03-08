@@ -1,7 +1,7 @@
 From iris.algebra Require Import cmra auth list agree csum excl gset frac numbers.
 From SegmentQueue.util Require Import cmra.
 
-Lemma list_lookup_local_update {A: ucmraT}:
+Lemma list_lookup_local_update {A: ucmra}:
   forall (x y x' y': list A),
     (forall i, (x !! i, y !! i) ~l~> (x' !! i, y' !! i)) ->
     (x, y) ~l~> (x', y').
@@ -21,7 +21,7 @@ Proof.
   all: intros i; by destruct (Hup' i).
 Qed.
 
-Lemma list_append_local_update {A: ucmraT}:
+Lemma list_append_local_update {A: ucmra}:
   forall (x z: list A), (forall n, ✓{n} z) -> (x, ε) ~l~> (x ++ z, (replicate (length x) ε) ++ z).
 Proof.
   intros ? ? Hzv. apply local_update_unital=> n mz Hxv Hx.
@@ -40,7 +40,7 @@ Proof.
   by rewrite Heq.
 Qed.
 
-Lemma list_alter_local_update {A: ucmraT}:
+Lemma list_alter_local_update {A: ucmra}:
   forall n f g (x y: list A),
     (x !! n, y !! n) ~l~> (f <$> (x !! n), g <$> (y !! n)) ->
     (x, y) ~l~> (alter f n x, alter g n y).
@@ -53,7 +53,7 @@ Proof.
   - by repeat rewrite list_lookup_alter_ne.
 Qed.
 
-Lemma None_local_update {A: cmraT}: forall (x: A) a b, (None, Some x) ~l~> (a, b).
+Lemma None_local_update {A: cmra}: forall (x: A) a b, (None, Some x) ~l~> (a, b).
 Proof.
   intros. apply local_update_valid0=> _ _ [HContra|HContra].
   - inversion HContra.
@@ -61,11 +61,11 @@ Proof.
     destruct HContra as [?|(? & ? & ? & ? & _)]; discriminate.
 Qed.
 
-Lemma local_update_refl {A: cmraT}: forall (a b: A),
+Lemma local_update_refl {A: cmra}: forall (a b: A),
   (a, b) ~l~> (a, b).
 Proof. done. Qed.
 
-Lemma option_local_update' {A: ucmraT} (x x' y': A):
+Lemma option_local_update' {A: ucmra} (x x' y': A):
   (x, ε) ~l~> (x', y') -> (Some x, ε) ~l~> (Some x', Some y').
 Proof.
   intros HOld. apply local_update_unital. intros ? ?.
@@ -75,7 +75,7 @@ Proof.
   simpl in *. split; try done. rewrite -Some_op. by constructor.
 Qed.
 
-Lemma option_local_update'' {A: cmraT} (x y: A):
+Lemma option_local_update'' {A: cmra} (x y: A):
   (forall n, ✓{n} x -> ✓{n} (y ⋅ x)) ->
   (Some x, ε) ~l~> (Some (y ⋅ x), Some y).
 Proof.
@@ -85,13 +85,13 @@ Proof.
   apply Some_validN. auto.
 Qed.
 
-Lemma option_local_update''' {A: cmraT} (x y z: A):
+Lemma option_local_update''' {A: cmra} (x y z: A):
   z ≡ y ⋅ x ->
   (forall n, ✓{n} x -> ✓{n} (y ⋅ x)) ->
   (Some x, ε) ~l~> (Some z, Some y).
 Proof. intros ->. apply option_local_update''. Qed.
 
-Lemma list_lookup_local_update' {A: ucmraT}:
+Lemma list_lookup_local_update' {A: ucmra}:
   forall (x y x' y': list A),
     (forall i, (x !! i, y !! i) ~l~> (x' !! i, y' !! i)) ->
     (x, y) ~l~> (x', y').
@@ -111,7 +111,7 @@ Proof.
   all: intros i; by destruct (Hup' i).
 Qed.
 
-Lemma list_app_l_local_update {A: ucmraT}:
+Lemma list_app_l_local_update {A: ucmra}:
   forall (x y y' z: list A),
     (y, ε) ~l~> (y', z) ->
     (x ++ y, ε) ~l~> (x ++ y', (replicate (length x) ε) ++ z).
@@ -155,7 +155,7 @@ Proof.
   }
 Qed.
 
-Lemma list_app_r_local_update {A: ucmraT}:
+Lemma list_app_r_local_update {A: ucmra}:
   forall (x x' y y': list A),
     length x = length x' ->
     (x, ε) ~l~> (x', y') ->
@@ -186,7 +186,7 @@ Proof.
   apply list_cmra_mixin.
 Qed.
 
-Lemma ucmra_cancel_local_update {A: ucmraT} (x: A) `{!Cancelable x}:
+Lemma ucmra_cancel_local_update {A: ucmra} (x: A) `{!Cancelable x}:
   (x, x) ~l~> (ε, ε).
 Proof.
   intros n f ? Heq. split; first by apply ucmra_unit_validN.

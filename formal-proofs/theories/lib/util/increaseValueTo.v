@@ -12,7 +12,7 @@ From iris.heap_lang Require Export proofmode.
 
 Section proof.
 
-Context `{heapG}.
+Context `{heapGS}.
 
 Theorem increaseValueTo_spec (ℓ: loc) (n: Z):
   ⊢ <<< ∀ (m: Z), ▷ ℓ ↦ #m >>>

@@ -1,4 +1,4 @@
-From iris.proofmode Require Import tactics.
+From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Export atomic.
 From iris.heap_lang Require Import proofmode notation lang.
 From SegmentQueue.util Require Import everything.
@@ -11,7 +11,7 @@ Definition forRange : val :=
 
 Section for_proof.
 
-Context `{!heapG Σ}.
+Context `{!heapGS Σ}.
 
 Theorem forRange_spec (Φ: nat -> iProp Σ) (e: val) (n: nat):
   (∀ i, ⌜(i < n)%nat⌝ -∗ {{{ Φ i }}}

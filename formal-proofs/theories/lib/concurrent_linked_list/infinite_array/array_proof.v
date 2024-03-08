@@ -8,7 +8,7 @@ Require Import SegmentQueue.util.everything.
 
 Section array_impl.
 
-Context `{heapG Σ} `{iSegmentG Σ}.
+Context `{heapGS Σ} `{iSegmentG Σ}.
 
 Variable (segment_size pointer_shift: positive).
 Variable (limit: Pos.to_nat segment_size < 2 ^ Pos.to_nat pointer_shift).
@@ -126,7 +126,7 @@ Proof.
   iDestruct (own_valid_2 with "HValues HValues'") as %[_ HValid]%pair_valid.
   iDestruct (own_valid_2 with "HValues HValues''") as %[_ HValid']%pair_valid.
   move: HValid HValid'=> /=. rewrite -!Some_op !Some_valid=> HAgree HAgree'.
-  apply agree_op_invL' in HAgree. apply agree_op_invL' in HAgree'. subst v' v''.
+  apply to_agree_op_inv_L in HAgree. apply to_agree_op_inv_L in HAgree'. subst v' v''.
   rewrite /NNode.
   iInv "HInv" as "HOpen" "HClose".
   iAssert (|={E ∖ ↑N.@"node", E ∖ ↑N}=> |={E ∖ ↑N, E ∖ ↑N.@"node"}=> emp)%I
@@ -523,7 +523,7 @@ Canonical Structure array_impl
           (segment_size pointer_shift: positive)
           (limit: Pos.to_nat segment_size < 2 ^ Pos.to_nat pointer_shift)
           {list_impl: listInterface}
-          `{!heapG Σ} `{iSegmentG Σ}
+          `{!heapGS Σ} `{iSegmentG Σ}
           (list_spec: ∀ (N: namespace), listSpec Σ list_impl (node_segment segment_size pointer_shift limit N))
           {impl: segmentInterface} (segment_spec: segmentSpec Σ impl)
           `{!iLinkedListG segment_spec Σ} :=

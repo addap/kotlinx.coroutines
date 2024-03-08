@@ -42,7 +42,7 @@ From iris.algebra Require Import excl cmra auth gset numbers.
 
 Section proof.
 
-Context `{heapG Σ}.
+Context `{heapGS Σ}.
 
 Variable (array_interface: infiniteArrayInterface).
 Variable (aspc: infiniteArraySpec Σ array_interface).
@@ -140,7 +140,7 @@ Proof.
   move: (big_opL_op_prodR 0)=> /= HOpL. rewrite !HOpL=> /=.
   rewrite -!pair_op ucmra_unit_left_id.
   rewrite -big_opL_op_gset -big_opL_op_max_nat /=.
-  rewrite max_nat_op_max Max.max_l.
+  rewrite max_nat_op Max.max_l.
   2: {
     clear. move: m n. elim=> /= [n|m' IHm n].
     lia.
@@ -162,7 +162,7 @@ Lemma iterator_counter_at_least_implies_bound γ n m:
 Proof.
   iIntros "HLeast HAuth".
   by iDestruct (own_valid_2 with "HAuth HLeast")
-    as %[[_ HValid%max_nat_included]%prod_included _]%auth_both_valid.
+    as %[[_ HValid%max_nat_included]%prod_included _]%auth_both_valid_discrete.
 Qed.
 
 Theorem iterator_increaseValueTo_spec γ (fℓ: loc) (n: nat):
@@ -450,11 +450,11 @@ Proof.
   - iSplitR.
     * iDestruct "HPure" as ">HPure".
       iDestruct "HPure"
-        as %[[_ HValid%max_nat_included]%prod_included _]%auth_both_valid.
+        as %[[_ HValid%max_nat_included]%prod_included _]%auth_both_valid_discrete.
       simpl in *. lia.
     * iIntros "_". iDestruct "HPure" as ">HPure".
       iDestruct "HPure"
-        as %[[_ HValid%max_nat_included]%prod_included _]%auth_both_valid.
+        as %[[_ HValid%max_nat_included]%prod_included _]%auth_both_valid_discrete.
       simpl in *. lia.
 Qed.
 

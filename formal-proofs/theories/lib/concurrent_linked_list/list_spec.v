@@ -4,7 +4,7 @@ From iris.program_logic Require Import atomic.
 From iris.heap_lang Require Export proofmode notation lang.
 Open Scope nat.
 
-Record listSpec Σ `{!heapG Σ}
+Record listSpec Σ `{!heapGS Σ}
        (impl: listInterface)
        {seg_impl: segmentInterface}
        (segment_spec: segmentSpec Σ seg_impl) :=

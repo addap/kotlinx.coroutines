@@ -231,7 +231,7 @@ Definition threadQueueΣ : gFunctors := #[GFunctor algebra].
 Instance subG_threadQueueΣ {Σ} : subG threadQueueΣ Σ -> threadQueueG Σ.
 Proof. solve_inG. Qed.
 
-Context `{heapG Σ} `{iteratorG Σ} `{threadQueueG Σ} `{futureG Σ}.
+Context `{heapGS Σ} `{iteratorG Σ} `{threadQueueG Σ} `{futureG Σ}.
 Variable (N NFuture: namespace).
 Let NTq := N .@ "tq".
 Let NArr := N .@ "array".
@@ -496,7 +496,7 @@ Proof.
   iIntros "H● H◯".
   iDestruct (own_valid_2 with "H● H◯")
     as %[[_ [(v&HEl&HInc)%list_singletonM_included _]%prod_included
-         ]%prod_included _]%auth_both_valid.
+         ]%prod_included _]%auth_both_valid_discrete.
   simpl in *. iPureIntro.
   rewrite map_lookup in HEl.
   destruct (l !! i) as [el|]; simpl in *; simplify_eq.
@@ -528,7 +528,7 @@ Proof.
   iIntros "H● HState".
   iDestruct (own_valid_2 with "H● HState")
     as %[[_ [_ HEq%Excl_included]%prod_included]%prod_included
-                                                _]%auth_both_valid.
+                                                _]%auth_both_valid_discrete.
   by simplify_eq.
 Qed.
 
@@ -587,7 +587,7 @@ Proof.
   rewrite -fupd_wp.
   iMod (own_alloc (cell_list_contents_auth_ra [] 0
                    ⋅ ◯ (ε, (ε, Excl' 0)))) as (γtq) "[H● H◯]".
-  { apply auth_both_valid. split=> /=.
+  { apply auth_both_valid_discrete. split=> /=.
     - apply pair_included. split; first by apply ucmra_unit_least.
       apply pair_included. split; first by apply ucmra_unit_least.
       done.
@@ -675,7 +675,7 @@ Theorem deq_front_at_least_valid γtq n l deqFront :
   ⌜n <= deqFront⌝.
 Proof.
   iIntros "H● H◯".
-  iDestruct (own_valid_2 with "H● H◯") as %[HValid _]%auth_both_valid.
+  iDestruct (own_valid_2 with "H● H◯") as %[HValid _]%auth_both_valid_discrete.
   apply prod_included in HValid. destruct HValid as [HValid _].
   apply prod_included in HValid. destruct HValid as [_ HValid].
   apply prod_included in HValid. destruct HValid as [_ HValid].
@@ -709,7 +709,7 @@ Proof.
   case=> _/=. case=>/=. case.
 Qed.
 
-Lemma None_op_right_id (A: cmraT) (a: option A): a ⋅ None = a.
+Lemma None_op_right_id (A: cmra) (a: option A): a ⋅ None = a.
 Proof. by destruct a. Qed.
 
 Lemma cell_list_contents_cell_update_alloc s
@@ -1293,7 +1293,7 @@ Proof.
   rewrite awakening_permit_combine; last lia.
   iDestruct (own_valid_2 with "H● HAwaks")
     as %[[[_ [HValid%nat_included _]%prod_included]%prod_included
-             ]%prod_included _]%auth_both_valid.
+             ]%prod_included _]%auth_both_valid_discrete.
   simpl in *. iPureIntro; lia.
 Qed.
 
@@ -1307,7 +1307,7 @@ Proof.
   rewrite suspension_permit_combine; last lia.
   iDestruct (own_valid_2 with "H● HSuspends")
     as %[[[HValid%nat_included _]%prod_included
-             _]%prod_included _]%auth_both_valid.
+             _]%prod_included _]%auth_both_valid_discrete.
   simpl in *. iPureIntro; lia.
 Qed.
 
@@ -2917,7 +2917,7 @@ Proof.
     - move=> HContra. do 2 apply Cinr_inj in HContra. case HContra.
       simpl. by case.
     - do 2 rewrite Cinr_included. rewrite pair_included. case=> /=.
-      rewrite nat_included nat_op_plus. lia.
+      rewrite nat_included nat_op. lia.
   }
   iDestruct (infinite_array_mapsto_agree with "H↦ H↦'") as "><-".
   destruct d' as [[|]|].
@@ -3072,7 +3072,7 @@ Proof.
     - move=> HContra. do 2 apply Cinr_inj in HContra. case HContra.
       simpl. by case.
     - do 2 rewrite Cinr_included. rewrite pair_included. case=> /=.
-      rewrite nat_included nat_op_plus. lia.
+      rewrite nat_included nat_op. lia.
   }
   iDestruct (infinite_array_mapsto_agree with "H↦ H↦'") as "><-".
   iDestruct "HRR" as "(HInside & HCancHandle & HRR)".

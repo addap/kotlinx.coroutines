@@ -16,7 +16,7 @@ Record uniqueValue {Σ} {name value: Type} :=
 Existing Instance has_value_persistent.
 Existing Instance has_value_timeless.
 
-Record linkedListNodeSpec Σ `{!heapG Σ} (impl: linkedListNodeInterface) :=
+Record linkedListNodeSpec Σ `{!heapGS Σ} (impl: linkedListNodeInterface) :=
   LinkedListNodeSpec {
       linkedListNode_name: Type;
       linkedListNode_name_inhabited: Inhabited linkedListNode_name;
@@ -42,7 +42,7 @@ Record linkedListNodeSpec Σ `{!heapG Σ} (impl: linkedListNodeInterface) :=
 Existing Instance linkedListNode_name_inhabited.
 Existing Instance is_linkedListNode_persistent.
 
-Record segmentSpec Σ `{!heapG Σ} (impl: segmentInterface) :=
+Record segmentSpec Σ `{!heapGS Σ} (impl: segmentInterface) :=
   SegmentSpec {
       linkedListNode_base: @linkedListNodeSpec Σ _ (base impl);
       id_uniqueValue: @uniqueValue

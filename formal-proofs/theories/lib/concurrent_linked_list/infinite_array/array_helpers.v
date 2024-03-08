@@ -17,7 +17,7 @@ End impl.
 
 Section proof.
 
-Context `{!heapG Σ}.
+Context `{!heapGS Σ}.
 
 Variable (array_interface: infiniteArrayInterface).
 Variable (aspc: infiniteArraySpec Σ array_interface).

@@ -11,7 +11,7 @@ Require Export
   we have idx = id * SEGMENT_SIZE + i
   but the naming seems to be not consistent.
 *)
-Record infiniteArraySpec Σ `{!heapG Σ} (impl: infiniteArrayInterface) :=
+Record infiniteArraySpec Σ `{!heapGS Σ} (impl: infiniteArrayInterface) :=
   InfiniteArraySpec {
       (* a.d. proposition to be an infinite array.
         cell_is_owned seems to be a predicate on array indices that says that the cell is not in the initial NONEV state. *)

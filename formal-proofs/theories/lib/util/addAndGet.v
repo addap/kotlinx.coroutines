@@ -13,7 +13,7 @@ From iris.heap_lang Require Import proofmode.
 
 Section proof.
 
-Context `{heapG}.
+Context `{heapGS}.
 
 Theorem addAndGet_spec (ℓ: loc) (Δ: Z):
   ⊢ <<< ∀ (k: Z), ▷ ℓ ↦ #k >>>

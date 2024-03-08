@@ -47,7 +47,7 @@ Definition futureΣ : gFunctors := #[GFunctor algebra].
 Instance subG_futureΣ {Σ} : subG futureΣ Σ -> futureG Σ.
 Proof. solve_inG. Qed.
 
-Context `{heapG Σ} `{futureG Σ} (N: namespace).
+Context `{heapGS Σ} `{futureG Σ} (N: namespace).
 
 Definition permit_auth_ra (present: bool): permit :=
   Some (if present then Cinl 1%Qp else Cinr (to_agree ())).
@@ -86,14 +86,14 @@ Global Instance future_cancellation_permit_Fractional γ:
   Fractional (future_cancellation_permit γ).
 Proof.
   iIntros (x y). rewrite /future_cancellation_permit.
-  by rewrite -own_op -auth_frag_op -pair_op -Some_op -Cinl_op -frac_op'.
+  by rewrite -own_op -auth_frag_op -pair_op -Some_op -Cinl_op -frac_op.
 Qed.
 
 Global Instance future_completion_permit_Fractional γ:
   Fractional (future_completion_permit γ).
 Proof.
   iIntros (x y). rewrite /future_completion_permit.
-  by rewrite -own_op -auth_frag_op -!pair_op -Some_op -Cinl_op -frac_op'.
+  by rewrite -own_op -auth_frag_op -!pair_op -Some_op -Cinl_op -frac_op.
 Qed.
 
 Theorem future_cancellation_permit_valid γ q:
@@ -143,7 +143,7 @@ Proof.
   iDestruct (own_valid_2 with "H1 H2")
     as %[[HValid _]%pair_valid _]%pair_valid.
   exfalso. move: HValid=> /=. rewrite -Some_op Some_valid=> HValid.
-  by apply agree_op_invL' in HValid.
+  by apply to_agree_op_inv_L in HValid.
 Qed.
 
 Definition future_invariant (R: val -> iProp Σ) (γ: gname) (ℓ: loc)
@@ -196,7 +196,7 @@ Theorem future_cancellation_permit_exclusive γ q:
 Proof.
   iIntros "H1 H2". iCombine "H1" "H2" as "H".
   iDestruct (own_valid with "H") as %HValid. exfalso. move: HValid.
-  case=> _/=. move: (frac_valid' (1 + q)). case=> HOk _ HOk'. apply HOk in HOk'.
+  case=> _/=. move: (frac_valid (1 + q)). case=> HOk _ HOk'. apply HOk in HOk'.
   by eapply Qp_not_plus_q_ge_1.
 Qed.
 
@@ -206,7 +206,7 @@ Proof.
   iIntros "H1 H2". iCombine "H1" "H2" as "H".
   iDestruct (own_valid with "H") as %HValid. exfalso. move: HValid.
   case; case=> _/=.
-  move: (frac_valid' (1 + q)). case=> HOk _ HOk' _. apply HOk in HOk'.
+  move: (frac_valid (1 + q)). case=> HOk _ HOk' _. apply HOk in HOk'.
   by eapply Qp_not_plus_q_ge_1.
 Qed.
 
@@ -287,7 +287,7 @@ Proof.
     }
     iModIntro. by wp_pures.
   - iDestruct (own_valid_2 with "H● HPermit")
-      as %[[[_ HValid]%pair_included _]%pair_included _]%auth_both_valid.
+      as %[[[_ HValid]%pair_included _]%pair_included _]%auth_both_valid_discrete.
     exfalso. move: HValid. rewrite /permit_auth_ra.
     rewrite Some_included. case=> HContra.
     * inversion HContra.
@@ -349,7 +349,7 @@ Proof.
     { iExists (FutureCompleted v). iFrame. }
     iModIntro. by wp_pures.
   - iDestruct (own_valid_2 with "H● HPermit")
-      as %[[_ HValid]%pair_included _]%auth_both_valid.
+      as %[[_ HValid]%pair_included _]%auth_both_valid_discrete.
     exfalso. move: HValid. rewrite /permit_auth_ra.
     rewrite Some_included. case=> HContra.
     * inversion HContra.
@@ -371,7 +371,7 @@ Proof.
                     ◯ (None, None, Some (Cinl 1%Qp)))))
     as (γ) "[H● [H◯ H◯']]".
   {
-    apply auth_both_valid. split; last done.
+    apply auth_both_valid_discrete. split; last done.
     repeat (apply prod_included'; split). all: by simpl.
   }
   rewrite -wp_fupd.
@@ -394,7 +394,7 @@ Proof.
                     ◯ (None, None, Some (Cinl 1%Qp)))))
     as (γ) "[H● [H◯ H◯']]".
   {
-    apply auth_both_valid. split; last done.
+    apply auth_both_valid_discrete. split; last done.
     repeat (apply prod_included'; split). all: by simpl.
   }
   rewrite -wp_fupd.

@@ -14,7 +14,7 @@ From iris.heap_lang Require Import proofmode.
 
 Section proof.
 
-Context `{heapG}.
+Context `{heapGS}.
 
 Theorem addConditionally_spec (pred: Z → bool) (ℓ: loc) (Δ: Z) (condition: val):
   ⊢ (∀ (k: Z), {{{ True }}}

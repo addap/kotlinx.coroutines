@@ -64,7 +64,7 @@ Definition barrierΣ : gFunctors := #[GFunctor algebra].
 Instance subG_barrierΣ {Σ} : subG barrierΣ Σ -> barrierG Σ.
 Proof. solve_inG. Qed.
 
-Context `{heapG Σ} `{iteratorG Σ} `{threadQueueG Σ} `{futureG Σ} `{barrierG Σ}.
+Context `{heapGS Σ} `{iteratorG Σ} `{threadQueueG Σ} `{futureG Σ} `{barrierG Σ}.
 Variable (limit: positive).
 Variable (N NFuture: namespace).
 Variable (HNDisj: N ## NFuture).
@@ -107,7 +107,7 @@ Theorem newBarrier_spec:
 Proof.
   iIntros (Φ) "#HHeap HΦ".
   iMod (own_alloc (● (0, Some (Cinl limit)) ⋅ ◯ (0, Some (Cinl limit))))
-    as (γb) "[H● H◯]"; first by apply auth_both_valid.
+    as (γb) "[H● H◯]"; first by apply auth_both_valid_discrete.
   wp_lam. wp_bind (newThreadQueue _ _).
   iApply (newThreadQueue_spec with "HHeap").
   iIntros (γa γtq γe γd e d) "!> [#HTq HThreadState]".
@@ -163,7 +163,7 @@ Proof.
   iInv "HInv" as (n) "(>[[% H●]|[-> HContra]] & Hℓ & HEntries & HState)".
   2: {
     iDestruct (own_valid_2 with "HContra HEntry") as
-        %[[_ HInc]%prod_included _]%auth_both_valid. exfalso.
+        %[[_ HInc]%prod_included _]%auth_both_valid_discrete. exfalso.
     move: HInc=> /=. rewrite Some_included. case.
     + intros HContra. inversion HContra.
     + rewrite csum_included. case; first done.
@@ -340,7 +340,7 @@ Proof.
   }
   iAssert (⌜(n > 0)%nat⌝)%I with "[-]" as %HN'Gt.
   { iDestruct (own_valid_2 with "H● HInhabit") as
-        %[[HOk%nat_included _]%prod_included _]%auth_both_valid.
+        %[[HOk%nat_included _]%prod_included _]%auth_both_valid_discrete.
     iPureIntro; simpl in *; lia. }
   iMod (register_cancellation with "HTq HToken HState")
        as "[HCancToken HState]"; first by solve_ndisj.

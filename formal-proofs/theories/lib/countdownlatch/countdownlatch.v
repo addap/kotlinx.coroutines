@@ -95,7 +95,7 @@ Definition latchΣ : gFunctors := #[GFunctor algebra].
 Instance subG_latchΣ {Σ} : subG latchΣ Σ -> latchG Σ.
 Proof. solve_inG. Qed.
 
-Context `{heapG Σ} `{iteratorG Σ} `{threadQueueG Σ} `{futureG Σ} `{latchG Σ}.
+Context `{heapGS Σ} `{iteratorG Σ} `{threadQueueG Σ} `{futureG Σ} `{latchG Σ}.
 Variable (N NFuture: namespace).
 Variable (HNDisj: N ## NFuture).
 Let NLatch := N .@ "Latch".
@@ -174,7 +174,7 @@ Proof.
   {
     iMod (own_alloc (● (0, Some (Cinr None)) ⋅ ◯ (0, Some (Cinr None))))
       as (γl) "[H● H◯]".
-    by apply auth_both_valid=> //.
+    by apply auth_both_valid_discrete=> //.
     wp_lam. wp_bind (newThreadQueue _ _).
     iApply (newThreadQueue_spec with "HHeap").
     iIntros (γa γtq γe γd e d) "!> [#HTq HThreadState]".
@@ -192,7 +192,7 @@ Proof.
   iMod (own_alloc (● (0, Some (Cinl (Excl (Pos.of_nat n)))) ⋅
                    ◯ (0, Some (Cinl (Excl (Pos.of_nat n))))))
     as (γl) "[H● H◯]".
-  by apply auth_both_valid=> //.
+  by apply auth_both_valid_discrete=> //.
   wp_lam. wp_bind (newThreadQueue _ _).
   iApply (newThreadQueue_spec with "HHeap").
   iIntros (γa γtq γe γd e d) "!> [#HTq HThreadState]".
@@ -308,7 +308,7 @@ Proof.
     rewrite /V'. iExists _. simpl. iFrame. done.
 Qed.
 
-Lemma excl_included {A: ofeT} (a b: A): Excl a ≼ Excl b -> a ≡ b.
+Lemma excl_included {A: ofe} (a b: A): Excl a ≼ Excl b -> a ≡ b.
 Proof. intros [x y]. destruct x; inversion_clear y. Qed.
 
 Lemma getCount_spec γl γa γtq γe γd s:
@@ -327,7 +327,7 @@ Proof.
   - wp_load.
     iAssert (⌜n' = n⌝)%I as %->.
     { iDestruct (own_valid_2 with "H● HState")
-        as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid.
+        as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid_discrete.
       destruct n as [|n].
       { exfalso. move: HValid. case. by move=> HContra; inversion HContra.
         rewrite csum_included. case; first done.
@@ -345,7 +345,7 @@ Proof.
     wp_load.
     iAssert (⌜n = 0⌝)%I as %->.
     { iDestruct (own_valid_2 with "H● HState")
-        as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid.
+        as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid_discrete.
       destruct n as [|n]; first done.
       { exfalso. move: HValid. case. by move=> HContra; inversion HContra.
         rewrite csum_included. case; first done.
@@ -361,7 +361,7 @@ Proof.
     wp_load.
     iAssert (⌜n = 0⌝)%I as %->.
     { iDestruct (own_valid_2 with "H● HState")
-        as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid.
+        as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid_discrete.
       destruct n as [|n]; first done.
       { exfalso. move: HValid. case. by move=> HContra; inversion HContra.
         rewrite csum_included. case; first done.
@@ -420,7 +420,7 @@ Proof.
     }
     iDestruct "HRest" as "[(_ & HContra & _)|(-> & H● & Hp)]".
     { iDestruct (own_valid_2 with "HContra HBroken")
-        as %[[_ HValid]%prod_included _]%auth_both_valid.
+        as %[[_ HValid]%prod_included _]%auth_both_valid_discrete.
       exfalso. move: HValid. rewrite Some_included. case.
       by intros HValid; inversion HValid.
       rewrite csum_included. case; first done.
@@ -470,7 +470,7 @@ Proof.
   - wp_faa.
     iAssert (⌜n' = n⌝)%I as %->.
     { iDestruct (own_valid_2 with "H● HState")
-        as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid.
+        as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid_discrete.
       destruct n as [|n].
       { exfalso. move: HValid. case. by move=> HContra; inversion HContra.
         rewrite csum_included. case; first done.
@@ -496,7 +496,7 @@ Proof.
       iModIntro. wp_pures. rewrite bool_decide_false; last by lia. by wp_pures.
     * rewrite /latch_state. destruct n as [|[|]]; last lia.
       { iDestruct (own_valid_2 with "H● HState")
-          as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid. exfalso.
+          as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid_discrete. exfalso.
         move: HValid; case=> HValid. by inversion HValid.
         move: HValid. rewrite csum_included.
         case; first done. case; intros (? & ? & ? & ? & ?)=> //. }
@@ -519,7 +519,7 @@ Proof.
     destruct n=>/=.
     2: {
       iDestruct (own_valid_2 with "H● HState")
-        as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid.
+        as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid_discrete.
       exfalso. move: HValid. case; first move=> HValid.
       by inversion HValid.
       rewrite csum_included. case; first done.
@@ -538,7 +538,7 @@ Proof.
     destruct n=>/=.
     2: {
       iDestruct (own_valid_2 with "H● HState")
-        as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid.
+        as %[[_ HValid%Some_included]%prod_included _]%auth_both_valid_discrete.
       exfalso. move: HValid. case; first move=> HValid.
       by inversion HValid.
       rewrite csum_included. case; first done.
@@ -608,7 +608,7 @@ Proof.
     { iAssert (∃ x, own γl (● (w, x)))%I with "[HRest]" as (?) "H●".
       by iDestruct "HRest" as "[(_ & H● & _)|(_ & H● & _)]"; by iExists _.
       iDestruct (own_valid_2 with "H● HWaiter")
-        as %[[HValid%nat_included _]%prod_included _]%auth_both_valid.
+        as %[[HValid%nat_included _]%prod_included _]%auth_both_valid_discrete.
       iPureIntro. simpl in *. lia.
     }
     iMod (register_cancellation with "HTq HToken HTqState")
@@ -647,7 +647,7 @@ Proof.
   - wp_faa.
     iAssert (⌜w > 0⌝)%I as %Hw.
     { iDestruct (own_valid_2 with "H● HWaiter")
-        as %[[HValid%nat_included _]%prod_included _]%auth_both_valid.
+        as %[[HValid%nat_included _]%prod_included _]%auth_both_valid_discrete.
       iPureIntro. simpl in *. lia. }
     iMod (register_cancellation with "HTq HToken HTqState")
         as "[HCancToken HState]"; first by solve_ndisj.

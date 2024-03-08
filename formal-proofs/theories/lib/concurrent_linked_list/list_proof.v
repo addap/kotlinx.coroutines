@@ -8,7 +8,7 @@ Open Scope nat.
 
 Section concurrentLinkedListProof.
 
-Context `{heapG Σ}.
+Context `{heapGS Σ}.
 Context {segment_interface: segmentInterface}.
 Variable segment_spec: (segmentSpec Σ segment_interface).
 Let segment_size := maxSlots segment_interface.
@@ -85,7 +85,7 @@ Proof.
     move: HValid.
     rewrite -auth_frag_op list_singletonM_op auth_frag_valid list_singletonM_valid.
     case. rewrite /= -Some_op Some_valid=> HAgree.
-    by apply agree_op_invL' in HAgree.
+    by apply to_agree_op_inv_L in HAgree.
 Defined.
 
 Definition segment_in_list γ γs id node: iProp :=
@@ -194,7 +194,7 @@ Proof.
   iDestruct (own_valid_2 with "HAuth HFrag") as
       %[(segment_params & HMapElem & HAgree)
           %list_singletonM_included _]
-       %auth_both_valid.
+       %auth_both_valid_discrete.
   iPureIntro.
   rewrite list_lookup_fmap in HMapElem.
   destruct (state !! id) as [[[p1 p4] [p2 p3]]|]; simpl in *; simplify_eq.
@@ -273,7 +273,7 @@ Proof.
   - destruct known_is_removed.
     * iDestruct (own_valid_2 with "Hγ HKnownRemoved")
         as %[(? & HLookup' & [_ HIncluded]%pair_included)
-               %list_singletonM_included _]%auth_both_valid.
+               %list_singletonM_included _]%auth_both_valid_discrete.
       exfalso.
       rewrite map_lookup HLookup /= in HLookup'.
       simplify_eq.
@@ -529,7 +529,7 @@ Proof.
   destruct (decide (length list = S id)) as [HIsTail|HNotTail].
   - destruct known_not_tail.
     { iDestruct (own_valid_2 with "Hγ HNotTail")
-        as %[[? [HValid _]]%list_singletonM_included _]%auth_both_valid.
+        as %[[? [HValid _]]%list_singletonM_included _]%auth_both_valid_discrete.
       exfalso.
       apply list_lookup_fmap_inv in HValid.
       destruct HValid as [? [_ HLookup']].
@@ -1167,7 +1167,7 @@ Proof.
   { (* Impossible: we have evidence of at least one pointer existing. *)
     destruct slots.
     * iDestruct (own_valid_2 with "Hγ HPtr") as
-          %[(? & HLookup' & HInc)%list_singletonM_included _]%auth_both_valid.
+          %[(? & HLookup' & HInc)%list_singletonM_included _]%auth_both_valid_discrete.
       rewrite map_lookup HLookup /= in HLookup'. simplify_eq.
       apply prod_included in HInc. destruct HInc as [_ HInc].
       apply Some_included in HInc. exfalso.
@@ -1178,7 +1178,7 @@ Proof.
         by destruct HContra as [?|[(? & ? & ? & ?)|(? & ? & ? & ? & ?)]].
     * iDestruct "HSlot" as ">HSlot".
       iCombine "HSlot" "HPtr" as "HFrag".
-      iDestruct (own_valid_2 with "Hγ HFrag") as %[HValid _]%auth_both_valid.
+      iDestruct (own_valid_2 with "Hγ HFrag") as %[HValid _]%auth_both_valid_discrete.
       exfalso. move: HValid.
       rewrite list_singletonM_op list_singletonM_included map_lookup HLookup /=.
       intros (? & HLookup' & HInc); simplify_eq.
@@ -1712,7 +1712,7 @@ Proof.
     rewrite -auth_frag_op list_singletonM_op -pair_op.
     rewrite ucmra_unit_left_id ucmra_unit_right_id.
     rewrite /auth_ra /segment_algebra_from_state /=.
-    apply auth_both_valid. split.
+    apply auth_both_valid_discrete. split.
     - apply list_singletonM_included.
       eexists. split; first done.
       apply prod_included=> /=. split; first done.
@@ -1794,7 +1794,7 @@ Qed.
 
 End concurrentLinkedListProof.
 
-Canonical Structure list_impl `{!heapG Σ}
+Canonical Structure list_impl `{!heapGS Σ}
           {impl: segmentInterface} (segment_spec: segmentSpec Σ impl)
           `{!iLinkedListG segment_spec Σ} :=
   {|

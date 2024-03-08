@@ -37,7 +37,7 @@ Definition callbackΣ : gFunctors := #[GFunctor algebra].
 Instance subG_callbackΣ {Σ} : subG callbackΣ Σ -> callbackG Σ.
 Proof. solve_inG. Qed.
 
-Context `{heapG Σ} `{callbackG Σ}.
+Context `{heapGS Σ} `{callbackG Σ}.
 
 (* true -> whole permit
    false -> not present *)
@@ -83,14 +83,14 @@ Global Instance callback_invokation_permit_Fractional γ:
   Fractional (callback_invokation_permit γ).
 Proof.
   iIntros (x y). rewrite /callback_invokation_permit.
-  by rewrite -own_op -auth_frag_op -!pair_op -Some_op -Cinl_op -frac_op'.
+  by rewrite -own_op -auth_frag_op -!pair_op -Some_op -Cinl_op -frac_op.
 Qed.
 
 Global Instance callback_cancellation_permit_Fractional γ:
   Fractional (callback_cancellation_permit γ).
 Proof.
   iIntros (x y). rewrite /callback_cancellation_permit.
-  by rewrite -own_op -auth_frag_op -!pair_op -Some_op -Cinl_op -frac_op'.
+  by rewrite -own_op -auth_frag_op -!pair_op -Some_op -Cinl_op -frac_op.
 Qed.
 
 Theorem callback_invokation_permit_valid γ q:
@@ -140,7 +140,7 @@ Proof.
   iDestruct (own_valid_2 with "H1 H2")
     as %[[[_ HValid]%pair_valid _]%pair_valid _]%pair_valid.
   exfalso. move: HValid=> /=. rewrite -Some_op Some_valid=> HValid.
-  by apply agree_op_invL' in HValid.
+  by apply to_agree_op_inv_L in HValid.
 Qed.
 
 Theorem callback_is_invoked_not_waiting γ v k:
@@ -151,7 +151,7 @@ Proof.
   rewrite /callback_is_invoked /callback_auth_ra.
   iDestruct (own_valid_2 with "H2 H1") as "H".
   iDestruct "H" as %HValid.
-  exfalso. move: HValid=> /=. rewrite auth_both_valid.
+  exfalso. move: HValid=> /=. rewrite auth_both_valid_discrete.
   case. move=> HValid _. move: HValid. 
   do 3 rewrite pair_included. do 3 case.
   move=> _ HContra _ _.
@@ -217,7 +217,7 @@ Proof.
   iIntros "H1 H2". iCombine "H1" "H2" as "H".
   iDestruct (own_valid with "H") as %HValid. exfalso. move: HValid.
   case; case=> _/=.
-  move: (frac_valid' (1 + q)). case=> HOk _ HOk' _. apply HOk in HOk'.
+  move: (frac_valid (1 + q)). case=> HOk _ HOk' _. apply HOk in HOk'.
   by eapply Qp_not_plus_q_ge_1.
 Qed.
 
@@ -227,7 +227,7 @@ Proof.
   iIntros "H1 H2". iCombine "H1" "H2" as "H".
   iDestruct (own_valid with "H") as %HValid. exfalso. move: HValid.
   case=> _/=.
-  move: (frac_valid' (1 + q)). case=> HOk _ HOk'. apply HOk in HOk'.
+  move: (frac_valid (1 + q)). case=> HOk _ HOk'. apply HOk in HOk'.
   by eapply Qp_not_plus_q_ge_1.
 Qed.
 
@@ -240,7 +240,7 @@ Proof.
   case; case; case=> /= HValid _ _ _.
   move: HValid.
   rewrite Some_valid.
-  apply agree_op_invL'.
+  apply to_agree_op_inv_L.
 Qed.
 
 Theorem invokeCallback_spec E' P γ l (v: val):
@@ -316,7 +316,7 @@ Proof.
   iExists k. by iFrame.
 Qed.
 
-Lemma None_op_right_id (A: cmraT) (a: option A): a ⋅ None = a.
+Lemma None_op_right_id (A: cmra) (a: option A): a ⋅ None = a.
 Proof. by destruct a. Qed.
 
 Theorem newCallback_spec P k:
@@ -334,7 +334,7 @@ Proof.
                     ◯ (None, None, None, Some (Cinl 1%Qp)))))
     as (γ) "[H● [H◯ H◯']]".
   {
-    apply auth_both_valid. split; last done.
+    apply auth_both_valid_discrete. split; last done.
     repeat (apply prod_included'; split). all: try by simpl.
     simpl.
     rewrite None_op_right_id.

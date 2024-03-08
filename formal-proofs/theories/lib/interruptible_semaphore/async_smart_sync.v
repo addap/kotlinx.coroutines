@@ -54,7 +54,7 @@ From iris.heap_lang Require Import proofmode.
 
 Section proof.
 
-Context `{heapG Σ} `{iteratorG Σ} `{threadQueueG Σ} `{futureG Σ}.
+Context `{heapGS Σ} `{iteratorG Σ} `{threadQueueG Σ} `{futureG Σ}.
 Variable (N NFuture: namespace).
 Variable (HNDisj: N ## NFuture).
 Let NSem := N .@ "Sem".

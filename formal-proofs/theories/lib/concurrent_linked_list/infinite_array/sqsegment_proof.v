@@ -6,7 +6,7 @@ From SegmentQueue.util Require Import local_updates cmra count_matching everythi
 
 Section infinite_array_segment_proof.
 
-Context `{heapG Σ}.
+Context `{heapGS Σ}.
 
 Variable segment_size: positive.
 Variable pointer_shift: positive.
@@ -142,7 +142,7 @@ Proof.
   iIntros (γ v1 v2) "H1 H2".
   iDestruct (own_valid_2 with "H1 H2") as %[_ HValid]%pair_valid.
   iPureIntro. move: HValid; simpl. rewrite -Some_op Some_valid.
-  intros HAgree. apply agree_op_invL' in HAgree. by inversion HAgree.
+  intros HAgree. apply to_agree_op_inv_L in HAgree. by inversion HAgree.
 Defined.
 
 Definition prev_uniqueValue :=
@@ -265,7 +265,7 @@ Proof.
   rewrite -auth_frag_op auth_frag_valid.
   rewrite gmap.singleton_op gmap.singleton_valid pair_valid.
   case=>_/=HH.
-  apply (@agree_op_inv' (option val -d> PropO)) in HH.
+  apply (@to_agree_op_inv (option val -d> PropO)) in HH.
   specialize (HH (Some (#(segmentId values),
                         #(segmentCleanedAndPointersLocation values),
                         #(segmentPrevLocation values),
@@ -297,7 +297,7 @@ Proof.
     rewrite /algebra_from_list.
     iDestruct (own_valid_2 with "Hγ HHandle") as
         %[[(seg & HLookup & HIncluded)%list_singletonM_included
-                                      _]%auth_both_valid _]%pair_valid.
+                                      _]%auth_both_valid_discrete _]%pair_valid.
     iPureIntro.
     rewrite map_lookup in HLookup.
     destruct (state !! id) as [state'|] eqn:HLookup'; last done.
@@ -354,7 +354,7 @@ Proof.
   {
     rewrite /algebra_from_list -!pair_op /= pair_valid.
     split.
-    - apply auth_both_valid. rewrite fmap_replicate.
+    - apply auth_both_valid_discrete. rewrite fmap_replicate.
       split; first done.
       apply list_lookup_valid=> i.
       destruct (_ !! i) eqn:E; last done.
@@ -446,7 +446,7 @@ Variable (segment_size pointer_shift: positive).
 Variable (limit: Pos.to_nat segment_size < 2 ^ Pos.to_nat pointer_shift).
 Variable (N: namespace).
 
-Definition node_linkedListNode `{!heapG Σ} `{!iSegmentG Σ}:
+Definition node_linkedListNode `{!heapGS Σ} `{!iSegmentG Σ}:
   linkedListNodeSpec Σ (base (SQSegment segment_size pointer_shift)) :=
   {| segment_spec.getPrevLoc_spec := getPrevLoc_spec segment_size N;
      segment_spec.getNextLoc_spec := getNextLoc_spec segment_size N;
@@ -455,7 +455,7 @@ Definition node_linkedListNode `{!heapG Σ} `{!iSegmentG Σ}:
        is_node_persistent segment_size N;
   |}.
 
-Canonical Structure node_segment `{!heapG Σ}
+Canonical Structure node_segment `{!heapGS Σ}
           `{!iSegmentG Σ}: segmentSpec Σ (SQSegment segment_size pointer_shift)
   := {|
   segment_spec.linkedListNode_base := node_linkedListNode;
