@@ -1,5 +1,6 @@
 From iris.base_logic Require Import lib.invariants.
 From iris.algebra Require Import cmra auth list agree csum excl.
+From iris.staging.algebra Require Import list.
 Require Import SegmentQueue.lib.concurrent_linked_list.infinite_array.sqsegment_impl.
 Require Import SegmentQueue.lib.concurrent_linked_list.segment_spec.
 From SegmentQueue.util Require Import local_updates cmra count_matching everything.
@@ -175,11 +176,11 @@ Definition is_node γ (node: val): iProp :=
                 inv N (segment_invariant γ values) ∗
                 own γ (ε, Some (to_agree values)) ∗
                 inv_heap_inv ∗
-                ℓ ↦□ (fun v => v = (#(segmentId values),
+                ℓ ↦_ (fun v => v = (#(segmentId values),
                                     #(segmentCleanedAndPointersLocation values),
                                     #(segmentPrevLocation values),
                                     #(segmentNextLocation values),
-                                    #(segmentDataLocation values))%V).
+                                    #(segmentDataLocation values))%V) □.
 
 Global Instance is_node_persistent γ node: Persistent (is_node γ node).
 Proof. apply _. Qed.

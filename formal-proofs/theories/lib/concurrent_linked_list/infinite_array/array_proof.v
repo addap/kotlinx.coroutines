@@ -1,6 +1,7 @@
 From iris.program_logic Require Import atomic.
 From iris.heap_lang Require Export proofmode notation lang.
 From iris.algebra Require Import auth agree list.
+From iris.staging.algebra Require Import list.
 From SegmentQueue.lib.concurrent_linked_list Require Import list_spec.
 From SegmentQueue.lib.concurrent_linked_list.infinite_array Require Import
      sqsegment_proof array_impl array_spec.
@@ -131,7 +132,7 @@ Proof.
   iInv "HInv" as "HOpen" "HClose".
   iAssert (|={E ∖ ↑N.@"node", E ∖ ↑N}=> |={E ∖ ↑N, E ∖ ↑N.@"node"}=> emp)%I
     as ">HMod".
-  { iApply (fupd_intro_mask'). apply difference_mono_l, nclose_subseteq. }
+  { iApply (fupd_mask_subseteq). apply difference_mono_l, nclose_subseteq. }
   iDestruct (big_sepL_lookup_acc _ _ (i `mod` Pos.to_nat segment_size)
                with "HOpen") as "[HElement HRestore]".
   { rewrite lookup_seq /=. split; first done.
@@ -161,7 +162,7 @@ Theorem cancelCell_spec γ co p i:
   is_infinite_array γ co -∗
   is_infinite_array_cell_pointer γ p i -∗
   <<< ▷ cell_cancellation_handle' γ i >>>
-  cancelCell array_impl p @ ⊤ ∖ ↑N
+  cancelCell array_impl p @ ↑N
   <<< ▷ cell_is_cancelled' γ i, RET #() >>>.
 Proof.
   iIntros "#HArr #HCellPointer" (Φ) "AU". wp_lam.
@@ -272,7 +273,7 @@ Proof.
       first by iExists _, _; iFrame "H●".
     rewrite /algebra_from_list.
     apply prod_update; simpl; last by rewrite ucmra_unit_right_id.
-    apply auth_update_core_id; first by apply _.
+    apply auth_update_dfrac_alloc; first by apply _.
     apply list_singletonM_included.
     assert (is_Some (state !! (i `mod` segment_size_nat))) as [cst HLookup].
     { apply lookup_lt_is_Some. rewrite HLength /segment_size_nat.
@@ -336,7 +337,7 @@ Proof.
 
   rewrite bool_decide_decide. destruct (decide _) as [HEq|HNeq]; wp_pures.
   - simplify_eq.
-    iApply "HΦ"; repeat iSplit.
+    iApply "HΦ". iModIntro. repeat iSplit.
     + iExists _, _. by iFrame "HInList' HId'".
     + by iPureIntro; lia.
     + iIntros (i HBound). iApply "HCellCanc". iPureIntro. lia.
@@ -356,6 +357,7 @@ Proof.
       by apply Nat.mod_upper_bound; lia.
       lia.
     }
+    iModIntro.
     repeat iSplit.
     + iExists _, _. rewrite Nat.div_mul; last lia. iFrame "HInList' HId'".
       iPureIntro. rewrite Nat.mod_mul; last lia. done.
@@ -379,6 +381,7 @@ Proof.
     first done.
   wp_load. iMod ("HℓRestore" with "Hℓ") as "_". iModIntro. wp_pures.
   iApply "HΦ". iExists _, _. iFrame "HInList HId".
+  iModIntro.
   iSplit.
   - iExists _; iSplit; first done.
     iExists _; iFrame "HInv HValues HHeapInv HLoc".
@@ -390,7 +393,7 @@ Theorem cutoffMoveForward_spec co γ (p v: val) i:
   is_infinite_array γ co -∗
   is_infinite_array_cell_pointer γ p i -∗
   <<< ∀ start_index, ▷ is_infinite_array_cutoff γ v start_index >>>
-    cutoffMoveForward array_impl v p @ ⊤ ∖ ↑N
+    cutoffMoveForward array_impl v p @ ↑N
   <<< ∃ (success: bool), if success
       then ∃ i', ⌜start_index ≤ i' ≤ max i start_index⌝ ∧
                  is_infinite_array_cutoff γ v i'
@@ -443,7 +446,7 @@ Qed.
 
 Theorem cutoffGetPointer_spec γ (v: val):
   ⊢ <<< ∀ i, ▷ is_infinite_array_cutoff γ v i >>>
-    cutoffGetPointer array_impl v @ ⊤
+    cutoffGetPointer array_impl v @ ∅
   <<< ∃ (p: val), is_infinite_array_cutoff γ v i ∗
       is_infinite_array_cutoff_reading γ p i, RET p >>>.
 Proof.
@@ -462,8 +465,9 @@ Proof.
     iIntros "H !>". iSplitL; last by iIntros "$ !> //".
     iExists _. by iSplitR.
   }
-  iIntros (? ?) "[HPointerLoc #HInList]".
-  iExists _. iSplitL; last by iIntros "!> HΦ !>"; wp_pures.
+  iIntros (? ?) "[HPointerLoc #HInList] !>".
+  iExists _. iSplitL.
+  2: { iIntros "HΦ !>". by iAssumption. }
   iSplitL.
   by iExists _; iSplitR.
   iExists _. by iFrame "HInList".

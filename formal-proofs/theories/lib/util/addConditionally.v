@@ -21,7 +21,7 @@ Theorem addConditionally_spec (pred: Z → bool) (ℓ: loc) (Δ: Z) (condition: 
                  condition #k
                {{{ RET #(pred k); True }}}) →
     <<< ∀ (k: Z), ▷ ℓ ↦ #k >>>
-      addConditionally #ℓ #Δ condition @ ⊤
+      addConditionally #ℓ #Δ condition @ ∅
     <<< if pred k then ℓ ↦ #(k + Δ) else ℓ ↦ #k, RET #(pred k) >>>.
 Proof.
   iIntros "#HCond" (Φ) "AU". iLöb as "IH". wp_lam. wp_pures.

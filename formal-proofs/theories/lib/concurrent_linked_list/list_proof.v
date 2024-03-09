@@ -392,7 +392,7 @@ Proof.
       as ">[Hγ #HCancelled]".
     {
       iMod (own_update with "Hγ") as "[Hγ HCancelled]";
-        first apply auth_update_core_id;
+        first apply auth_update_dfrac_alloc;
         last by iFrame.
       - apply _.
       - apply list_singletonM_included. rewrite list_lookup_fmap HLookup /=.
@@ -493,6 +493,7 @@ Proof.
       * iApply "HCanc''"; iPureIntro; lia.
       * assert (i = id') as -> by lia. iAssumption.
     + wp_pures. iApply "HΦ". iRight. iExists id', v'.
+      iModIntro.
       iSplit. by iPureIntro; split; [done|lia].
       iSplit. by iExists _. done.
 Qed.
@@ -618,6 +619,7 @@ Proof.
   iIntros (r) "!> Hr".
   destruct r; wp_pures.
   2: {
+    iModIntro.
     iApply "HΦ". iSplit; last by [iSplit; first by iExists _|iAssumption].
     iPureIntro; lia.
   }
@@ -626,6 +628,7 @@ Proof.
   iIntros (r') "!> Hr'".
   destruct r'; wp_pures.
   {
+    iModIntro.
     iApply "HΦ". iSplit; last by [iSplit; first by iExists _|iAssumption].
     iPureIntro; lia.
   }
@@ -950,7 +953,7 @@ Proof.
       + iRight. iSplitR; first done.
         iRight. iSplitR; first by iPureIntro; lia. done.
       + iLeft. iPureIntro. split; first done. lia.
-    - iRight. iSplit; first done.
+    - iRight. iModIntro. iSplit; first done.
       iLeft. iPureIntro. lia.
   }
 
@@ -960,6 +963,7 @@ Proof.
     iDestruct "HIdCur" as %HIdCur.
     iApply "HΦ".
     iSplitR. by iExists _.
+    iModIntro.
     iSplit; first by iPureIntro; lia. iAssumption.
   }
 
@@ -1059,7 +1063,7 @@ Proof.
   }
   iMod (own_update with "H●") as "[H● H◯]".
   {
-    apply auth_update_core_id with (b := extract_core <$> list); first done.
+    apply auth_update_dfrac_alloc with (b := extract_core <$> list); first done.
     apply list_lookup_included=> i.
     rewrite !map_lookup.
     destruct (list !! i) as [[[? ?] [? ?]]|] => /=; last done.
@@ -1080,8 +1084,10 @@ Proof.
     assert (id < length list) by (eapply lookup_lt_Some; done).
     lia.
   }
-  iExists γsi, nodei. iApply (own_mono with "H◯").
-  apply auth_included; split; first done. simpl.
+  iExists γsi, nodei. 
+  rewrite /segment_in_list /has_value. simpl.
+  iApply (own_mono with "H◯").
+  apply auth_frag_mono.
   apply list_singletonM_included. eexists.
   rewrite map_lookup HLookup' /=. by split.
 Qed.
@@ -1091,7 +1097,7 @@ Definition pointer_location γ ℓ id: iProp :=
 
 Lemma tryIncPointersHelper_spec (ℓ: loc):
   ⊢ <<< ∀ pointers slots, ▷ ℓ ↦ #(cleanedAndPointers_contents pointers slots) >>>
-    tryIncPointersHelper segment_interface #ℓ @ ⊤
+    tryIncPointersHelper segment_interface #ℓ @ ∅
   <<< ∃ (r: bool), if r
       then ⌜pointers ≠ 0 ∨ slots ≠ 0⌝ ∧
            ℓ ↦ #(cleanedAndPointers_contents (S pointers) slots)
@@ -1152,7 +1158,7 @@ Proof.
 
   wp_bind (addAndGet _ _).
   awp_apply addAndGet_spec without "HΦ". iInv "HList" as "HOpen".
-  iDestruct (concurrentLinkedList_insert with "Hγs HOpen")
+  iDestruct (concurrentLinkedList_insert with "Hγs HOpen") 
     as (list pointers slots) "(>HLookup & HSeg & >Hγ & HRestore)".
   iDestruct "HLookup" as %HLookup.
   iDestruct "HSeg" as "([HContents HSlot] & HNode' & HId' & Hcℓ & HRest)".
@@ -1284,7 +1290,7 @@ Theorem moveForward_spec γ γs (ℓ: loc) id p:
   is_concurrentLinkedList γ -∗
   segment_in_list γ γs id p -∗
   <<< ∀ id', ▷ pointer_location γ ℓ id' >>>
-    list_interfaces.moveForward (list_impl segment_interface) #ℓ p @ ⊤ ∖ ↑N
+    list_interfaces.moveForward (list_impl segment_interface) #ℓ p @ ↑N
   <<< ∃ (r: bool), if r
                    then pointer_location γ ℓ (max id id')
                    else ▷ pointer_location γ ℓ id' ∗ segment_is_cancelled γ id,
@@ -1338,7 +1344,8 @@ Proof.
   wp_bind (tryIncPointersHelper _ _).
   awp_apply tryIncPointersHelper_spec.
   iInv "HList" as "HOpen".
-  iApply (aacc_aupd with "AU"); first done.
+  iApply (aacc_aupd with "AU").
+  { by rewrite difference_empty. }
   (* This value doesn't mean anything; we only need to open this AU to be able to
      exit early if tryIncPointersHelper fails. *)
   iIntros (?) "HPointer".
@@ -1359,7 +1366,7 @@ Proof.
   2: {
     iRight. iDestruct "Hr" as ([-> ->]) "Hcℓ". iExists false. iFrame "HPointer".
     iMod (own_update with "Hγ") as "[Hγ $]".
-    { apply auth_update_core_id; first by apply _.
+    { apply auth_update_dfrac_alloc; first by apply _.
       apply list_singletonM_included. eexists.
       rewrite list_lookup_fmap HLookup /=.
       split; first done.
@@ -1475,7 +1482,7 @@ Lemma cancelCell_spec Ψ P γ γs id p (k: nat):
    Ψ ∗ ∃ n', ⌜(n = S k + n')%nat⌝ ∧
    segment_content _ _ segment_spec γs n')) -∗
   <<< P >>>
-    FAA (getCleanedAndPointersLoc segment_interface p) #(S k) @ ⊤ ∖ ↑N
+    FAA (getCleanedAndPointersLoc segment_interface p) #(S k) @ ↑N
   <<< ∃ (v: nat), Ψ ∗ if decide (v + S k = maxSlots segment_interface)%nat
                       then segment_is_cancelled γ id
                       else True, RET #v >>>.
@@ -1610,7 +1617,7 @@ Theorem onSlotCleaned_spec Ψ P γ γs id p:
    Ψ ∗ ∃ n', ⌜(n = S n')%nat⌝ ∧
    segment_content _ _ segment_spec γs n')) -∗
   <<< P >>>
-    list_interfaces.onSlotCleaned (list_impl segment_interface) p @ ⊤ ∖ ↑N
+    list_interfaces.onSlotCleaned (list_impl segment_interface) p @ ↑N
   <<< Ψ, RET #() >>>.
 Proof.
   iIntros "#[HList _] #HSeg HPUpdater" (Φ) "AU".
@@ -1669,7 +1676,7 @@ Proof.
   iDestruct "HSeg" as "(HContent & HNode' & HId' & Hcℓ & Hpℓ & HRest)".
   iDestruct "Hpℓ" as (pℓ') "[HValpℓ' Hpℓ]".
   iDestruct (has_value_agrees with "HValpℓ HValpℓ'") as "><-".
-  iAssert (▷ pℓ ↦ -)%I with "[Hpℓ]" as (?) "Hpℓ".
+  iAssert (∃ v, ▷ pℓ ↦ v)%I with "[Hpℓ]" as (?) "Hpℓ".
   { iDestruct "Hpℓ" as "[Hpℓ|Hpℓ]"; first by iExists _.
     iDestruct "Hpℓ" as (? ?) "(_ & _ & _ & Hpℓ)". by iExists _. }
   wp_store.
@@ -1679,7 +1686,7 @@ Qed.
 
 Lemma read_pointer_location γ (ℓ: loc):
   ⊢ <<< ∀ id, ▷ pointer_location γ ℓ id >>>
-    ! #ℓ @ ⊤
+    ! #ℓ @ ∅
   <<< ∃ γs p, pointer_location γ ℓ id ∗ segment_in_list γ γs id p, RET p >>>.
 Proof.
   iIntros (Φ) "AU".

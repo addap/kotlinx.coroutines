@@ -26,7 +26,7 @@ Theorem findCellAndMoveForward_spec N γ co p (v: val) (source_id id: nat):
   is_infinite_array _ _ aspc N γ co -∗
   is_infinite_array_cutoff_reading _ _ aspc N γ p source_id -∗
   <<< ∀ start_index, ▷ is_infinite_array_cutoff _ _ aspc N γ v start_index >>>
-      findCellAndMoveForward array_interface v #id p @ ⊤ ∖ ↑N
+      findCellAndMoveForward array_interface v #id p @ ↑N
   <<< ∃ p' id', is_infinite_array_cell_pointer _ _ aspc N γ p' id'
                 ∗ ⌜(id ≤ id')%nat⌝
                 ∗ (∀ i, (⌜max source_id id ≤ i < id'⌝)%nat

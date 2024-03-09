@@ -17,7 +17,7 @@ Context `{heapGS}.
 
 Theorem addAndGet_spec (ℓ: loc) (Δ: Z):
   ⊢ <<< ∀ (k: Z), ▷ ℓ ↦ #k >>>
-    addAndGet #ℓ #Δ @ ⊤
+    addAndGet #ℓ #Δ @ ∅
   <<< ℓ ↦ #(k + Δ), RET #(k + Δ) >>>.
 Proof.
   iIntros (Φ) "AU". iLöb as "IH". wp_lam. wp_pures.

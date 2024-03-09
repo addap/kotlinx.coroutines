@@ -16,7 +16,7 @@ Context `{heapGS}.
 
 Theorem increaseValueTo_spec (ℓ: loc) (n: Z):
   ⊢ <<< ∀ (m: Z), ▷ ℓ ↦ #m >>>
-    increaseValueTo #ℓ #n @ ⊤
+    increaseValueTo #ℓ #n @ ∅
   <<< ⌜(m >= n)%Z⌝ ∧ ℓ ↦ #m ∨ ⌜(m < n)%Z⌝ ∧ ℓ ↦ #n, RET #() >>>.
 Proof.
   iIntros (Φ) "AU". wp_lam. wp_pures. iLöb as "IH".

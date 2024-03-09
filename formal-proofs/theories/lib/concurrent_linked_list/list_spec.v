@@ -87,7 +87,7 @@ points to the maximum of from and to.id, and false if to is logically removed, i
         is_concurrentLinkedList N p γ -∗
         segment_in_list γ γs id v -∗
         <<< ∀ id', ▷ pointer_location γ ℓ id' >>>
-          moveForward impl #ℓ v @ ⊤ ∖ ↑N
+          moveForward impl #ℓ v @ ↑N
         <<< ∃ (r: bool), if r then pointer_location γ ℓ (max id id')
                               else ▷ pointer_location γ ℓ id'
                                    ∗ segment_is_cancelled γ id,
@@ -108,12 +108,12 @@ atomically exchanges Φ for Ψ, which means that the ability to increase cancell
         (P ==∗ ∀ n, segment_content _ _ segment_spec γs n ==∗
          Ψ ∗ ∃ n', ⌜(n = S n')%nat⌝ ∧ segment_content _ _ segment_spec γs n') -∗
         <<< P >>>
-          onSlotCleaned impl p @ ⊤ ∖ ↑N
+          onSlotCleaned impl p @ ↑N
         <<< Ψ, RET #() >>>;
       (* a.d. if we know a pointer to a segment, we can load it and get a segment *)
       pointer_location_load γ (ℓ: loc):
         ⊢ <<< ∀ id, ▷ pointer_location γ ℓ id >>>
-          ! #ℓ @ ⊤
+          ! #ℓ @ ∅
         <<< ∃ γs p, pointer_location γ ℓ id ∗ segment_in_list γ γs id p,
             RET p >>>;
       (* a.d. specialized invariant access lemma to get the number n of active cells.
@@ -127,8 +127,6 @@ atomically exchanges Φ for Ψ, which means that the ability to increase cancell
                             ▷ segment_content _ _ _ γs n ∗
                             (▷ segment_content _ _ _ γs n ={E ∖ ↑N, E}=∗ emp);
     }.
-
-Check findSegment_spec.
 
 Existing Instances is_concurrentLinkedList_persistent
          segment_in_list_persistent

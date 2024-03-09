@@ -5,6 +5,7 @@
 -arg -w -arg -projection-no-head-constant
 #./theories/lib/thread_queue/thread_queue.v
 ./theories/lib/thread_queue/callback.v
+./theories/lib/thread_queue/eio_broadcast.v
 #./theories/lib/interruptible_semaphore/sync_smart_sync.v
 #./theories/lib/interruptible_semaphore/async_immediate.v
 #./theories/lib/interruptible_semaphore/async_smart_sync.v

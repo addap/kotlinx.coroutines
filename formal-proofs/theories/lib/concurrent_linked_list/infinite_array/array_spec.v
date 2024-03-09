@@ -87,7 +87,7 @@ Segm and suspendSegm)—performed by allocating the concurrent linked list.
         is_infinite_array N γ co -∗
         is_infinite_array_cell_pointer N γ p i -∗
         <<< ▷ cell_cancellation_handle N γ i >>>
-            cancelCell impl p @ ⊤ ∖ ↑N
+            cancelCell impl p @ ↑N
         <<< ▷ cell_is_cancelled N γ i, RET #() >>>;
       (* Finding a cell with the given id—performed with a call to s0 = findSegment(s, id / SEGM SIZE) and
 later checking whether the requested segment identifier corresponds with the requested one and returning
@@ -124,7 +124,7 @@ later checking whether the requested segment identifier corresponds with the req
         is_infinite_array N γ co -∗
         is_infinite_array_cell_pointer N γ p i -∗
         <<< ∀ start_index, ▷ is_infinite_array_cutoff N γ v start_index >>>
-          cutoffMoveForward impl v p @ ⊤ ∖ ↑N
+          cutoffMoveForward impl v p @ ↑N
         <<< ∃ (success: bool), if success
             then ∃ i', ⌜start_index ≤ i' ≤ max i start_index⌝ ∧
                       is_infinite_array_cutoff N γ v i'
@@ -136,7 +136,7 @@ later checking whether the requested segment identifier corresponds with the req
         v is #ℓ for some location ℓ *)
       cutoffGetPointer_spec N γ (v: val):
         ⊢ <<< ∀ i, ▷ is_infinite_array_cutoff N γ v i >>>
-          cutoffGetPointer impl v @ ⊤
+          cutoffGetPointer impl v @ ∅
         <<< ∃ (p: val), is_infinite_array_cutoff N γ v i ∗
                         is_infinite_array_cutoff_reading N γ p i, RET p >>>;
       (* Checking the index of a cell—equal to s.id · SEGM SIZE + i, where the cell is (s, i); *)

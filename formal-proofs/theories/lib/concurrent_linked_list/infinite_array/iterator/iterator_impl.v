@@ -124,6 +124,7 @@ Proof.
   iIntros "HIss HIss'".
   iDestruct (own_valid_2 with "HIss HIss'") as %HContra.
   exfalso. revert HContra. clear. rewrite -auth_frag_op -pair_op.
+  rewrite auth_frag_valid.
   case; simpl. rewrite gset_disj_valid_op. by set_solver.
 Qed.
 
@@ -167,7 +168,7 @@ Qed.
 
 Theorem iterator_increaseValueTo_spec γ (fℓ: loc) (n: nat):
   ⊢ <<< ∀ m, ▷ iterator_counter γ fℓ m >>>
-    (increaseValueTo #fℓ #n) @ ⊤
+    (increaseValueTo #fℓ #n) @ ∅
   <<< ([∗ list] i ∈ seq m (n - m), iterator_issued γ i) ∗
       iterator_counter_at_least γ (max n m) ∗
       (⌜m >= n⌝ ∧ iterator_counter γ fℓ m ∨
@@ -182,7 +183,7 @@ Proof.
   { replace (n - m) with 0 by lia. simpl.
     iMod (own_update with "H●") as "[H● $]".
     {
-      apply auth_update_core_id=> /=; first by apply _.
+      apply auth_update_dfrac_alloc=> /=; first by apply _.
       do 2 try (apply prod_included=> /=; split).
       - by rewrite gset_disj_included.
       - apply max_nat_included=> /=; lia.
@@ -202,7 +203,7 @@ Lemma iterator_counter_is_at_least γ n:
   own γ (iterator_auth_ra n) ∗ iterator_counter_at_least γ n.
 Proof.
   iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
-  apply auth_update_core_id; first by apply _.
+  apply auth_update_dfrac_alloc; first by apply _.
   rewrite prod_included /=. split.
   by apply ucmra_unit_least.
   apply max_nat_included; simpl; lia.
@@ -211,7 +212,8 @@ Qed.
 Lemma iterator_issued_is_at_least γ n:
   iterator_issued γ n -∗ iterator_counter_at_least γ (S n).
 Proof.
-  iIntros "H". iApply (own_mono with "H"). apply auth_included; split=>//=.
+  iIntros "H". iApply (own_mono with "H"). 
+  apply auth_frag_mono.
   apply prod_included; split; first by apply ucmra_unit_least.
   apply max_nat_included. simpl. done.
 Qed.
@@ -383,7 +385,8 @@ Proof.
       iApply (iterator_counter_at_least_implies_bound
                 with "[HIssued] H●").
       iApply (own_mono with "HIssued").
-      rewrite auth_included /= prod_included /= max_nat_included /=.
+      apply auth_frag_mono.
+      rewrite prod_included /= max_nat_included /=.
       repeat split; eauto. apply ucmra_unit_least.
     }
     iAaccIntro with "HCounter".
@@ -394,13 +397,36 @@ Proof.
     assert (∃ c, start = S n + c) as [c ->]. by apply nat_le_sum; lia.
     rewrite replicate_plus big_sepL_app.
     iDestruct "HPs'" as "[HPs' HPs'']".
-    iSpecialize ("HPs" $! ([n] ++ seq (S n + c) (ns - (S n + c))) n
-                   with "[] HPs'")=> /=.
-    { iIntros (i Hi). iApply "HCancelled". iPureIntro. apply Hi. }
-    iMod ("HPs" with "[HIssued HIssued']") as "HPs".
-    { iFrame. iSplitR; first by iPureIntro; lia.
-      iApply (big_sepL_impl with "HIssued'"). iIntros "!>" (? ? HEl) "$".
-      iPureIntro. move: HEl. rewrite lookup_seq. case=> ->. lia. }
+    (* a.d. PORT is this the correct way to handle except_0 here? *)
+    rewrite bi.except_0_forall.
+    iSpecialize ("HPs" $! ([n] ++ seq (S n + c) (ns - (S n + c)))).
+    rewrite bi.except_0_forall.
+    iSpecialize ("HPs" $! n).
+    rewrite bi.except_0_forall.
+    iSpecialize ("HPs" $! ns).
+    iPoseProof (bi.except_0_frame_l with "[HIssued HIssued' HPs HPs']") as "HPs".
+    { iFrame. 
+      instantiate (1:=bi_sep _ _). 
+      instantiate (1:=bi_sep _ _). 
+      instantiate (1:=bi_sep _ _). 
+      iSplitL "HIssued"; first iApply "HIssued".
+      iSplitL "HIssued'"; first iApply "HIssued'".
+      iSplitL "HPs'"; first iApply "HPs'".
+      iApply "HCancelled". }
+    iPoseProof (bi.except_0_mono with "HPs") as "HPs".
+    { iIntros "[[HIssued [HIssued' [HPs' #HCancelled]]] HPs]".
+      iSpecialize ("HPs" with "[] HPs'")=> /=.
+      { iIntros (i Hi). iApply "HCancelled". iPureIntro. apply Hi. }
+      iSpecialize ("HPs" with "[HIssued HIssued']").
+      { iFrame. iSplitR; first by iPureIntro; lia.
+        iApply (big_sepL_impl with "HIssued'"). iIntros "!>" (? ? HEl) "$".
+        iPureIntro. move: HEl. rewrite lookup_seq. case=> ->. lia. }
+      iApply "HPs".
+    }
+    iPoseProof (except_0_fupd with "HPs") as "HPs".
+    iApply fupd_mask_mono.
+    { rewrite difference_empty. by done. }
+    iMod "HPs".
     iDestruct "HPs" as "[HP HPs]".
     rewrite seq_length. iCombine "HPs HPs''" as "HPs".
     iDestruct "HCounter" as "[[% HCounter]|[% HCounter]]".

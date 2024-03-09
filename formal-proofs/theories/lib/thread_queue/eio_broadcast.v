@@ -111,6 +111,7 @@ End impl.
 From iris.base_logic.lib Require Import invariants.
 From iris.heap_lang Require Import proofmode.
 From iris.algebra Require Import auth numbers list gset excl csum.
+From iris.staging.algebra Require Import list.
 From iris.algebra.lib Require Import excl_auth.
 
 Section proof.
@@ -248,7 +249,7 @@ Proof. apply _. Qed.
 Definition thread_queue_state γ (n: nat) :=
   own γ (◯ (ε, (ε, Excl' n))).
 
-Global Instance thread_queue_state_timeless:
+Global Instance thread_queue_state_timeless γ n:
   Timeless (thread_queue_state γ n).
 Proof. apply _. Qed.
 
@@ -666,7 +667,7 @@ Lemma deq_front_at_least_from_auth_ra γtq l deqFront:
   deq_front_at_least γtq deqFront.
 Proof.
   iIntros "H●". iMod (own_update with "H●") as "[$ $]"; last done.
-  apply auth_update_core_id. by apply _.
+  apply auth_update_dfrac_alloc. by apply _.
   apply prod_included=> /=. split; last by apply ucmra_unit_least.
   apply prod_included=> /=. split; first by apply ucmra_unit_least.
   apply prod_included=> /=. split; first by apply ucmra_unit_least.
@@ -682,7 +683,7 @@ Theorem cell_list_contents__deq_front_at_least i γtq l deqFront:
 Proof.
   iIntros (HLe) "H●".
   iMod (own_update with "H●") as "[$ $]"; last done.
-  apply auth_update_core_id.
+  apply auth_update_dfrac_alloc.
   by apply _.
   repeat (apply prod_included; split); simpl.
   all: try apply ucmra_unit_least.
@@ -1291,9 +1292,9 @@ Proof.
     2: iDestruct ("HΦ" $! false with "[HCellFilled HEnq HF HInvoke]")
       as "HΦ". 
     2: by iFrame; iExists _.
-    { (* with auth_update_core_id we can extract a persistent fraction out of the auth
+    { (* with auth_update_dfrac_alloc we can extract a persistent fraction out of the auth
          (namely that the cell is filled). We just need to prove that it holds using the HEl assumption. *)
-      apply auth_update_core_id. by apply _.
+      apply auth_update_dfrac_alloc. by apply _.
       apply prod_included; split=>/=; first by apply ucmra_unit_least.
       apply prod_included; split=>/=; last by apply ucmra_unit_least.
       apply list_singletonM_included. eexists. rewrite map_lookup HEl /=.
@@ -1431,7 +1432,7 @@ Proof.
     2: iSpecialize ("HΦ" $! false with "[H◯ HIsRes]");
       first by iFrame; iExists _, _.
     {
-      apply auth_update_core_id. by apply _.
+      apply auth_update_dfrac_alloc. by apply _.
       apply prod_included=>/=. split; first by apply ucmra_unit_least.
       apply prod_included=>/=. split; last by apply ucmra_unit_least.
       apply list_singletonM_included. eexists.
@@ -1792,7 +1793,8 @@ Proof.
     iModIntro.
     wp_pures.
     iApply "HΦ".
-    iExists _. iFrame. by iSplit.
+    iExists _. iFrame.
+    iModIntro. by iSplit.
 Qed.
 
 Lemma resume_spec γa γtq γe γd γres e d:
@@ -2003,9 +2005,9 @@ Proof.
   iModIntro.
   simplify_eq.
   wp_pure _.
-  iApply fupd_intro_mask; first by solve_ndisj.
-  iApply fupd_intro_mask; first by solve_ndisj.
-  iApply fupd_intro_mask; first by solve_ndisj.
+  iApply fupd_mask_intro_subseteq; first by solve_ndisj.
+  iApply fupd_mask_intro_subseteq; first by solve_ndisj.
+  iApply fupd_mask_intro_subseteq; first by solve_ndisj.
   replace (Z.sub enqCtr O) with (Z.of_nat enqCtr) by lia.
   do 3 wp_pure _.
   iApply (resume_all_loop_spec with "[HAwaks]").
@@ -2068,6 +2070,7 @@ Proof.
     iModIntro. wp_load.
     iApply "HΦ".
     iExists _. iFrame. 
+    iModIntro.
     iSplit; iSplit.
     + iApply "HRRsRestore".
       iFrame. iExists _. iFrame. iAssumption.
@@ -2127,6 +2130,7 @@ Proof.
     wp_pures. iApply "HΦ". iRight. iExists _, _. iSplitR; first done.
     iFrame.
     iExists _, _.
+    iModIntro.
     iSplit; first done.
     iSplit; first done.
     by iAssumption.
@@ -2166,6 +2170,7 @@ Proof.
   iModIntro.
   wp_pures.
   iApply "HΦ".
+  iModIntro.
   by iLeft. 
 Qed.
 
@@ -2199,7 +2204,7 @@ Proof.
     iApply "HΦ". iSplitL; last by iLeft.
     iFrame.
     iApply "HRRsRestore". iFrame.
-    iExists _, _. iFrame.
+    iExists _, _. iModIntro. iFrame.
     iSplit; first done. by iAssumption.
   - (* cell is already cancelled, this cannot happen *) 
     iDestruct (big_sepL_lookup_acc with "HRRs") as "[HRR HRRsRestore]";
@@ -2220,6 +2225,7 @@ Proof.
     wp_load.
     iApply "HΦ". iSplitR "HCancel".
     2: { iRight. 
+          iModIntro.
           iSplit; first done.
           iSplit; first done.
           iSplit; first done.
@@ -2227,6 +2233,7 @@ Proof.
     iFrame. iApply "HRRsRestore".
     iFrame. 
     iExists _, _. iFrame.
+    iModIntro.
     iSplit; done.
 Qed.
 
@@ -2337,6 +2344,7 @@ Proof.
       iAaccIntro with "HCancHandle". iIntros "$". by iFrame. iIntros "#HCancelled !> HΦ".
       wp_pures.
       iApply "HΦ".
+      iModIntro.
       iFrame.
 Qed.
 
