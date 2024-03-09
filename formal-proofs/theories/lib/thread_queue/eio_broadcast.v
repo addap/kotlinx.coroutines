@@ -1,6 +1,7 @@
 From SegmentQueue.util Require Import
   everything local_updates big_opL cmra count_matching find_index.
 
+From iris.bi.lib Require Import atomic.
 From iris.heap_lang Require Import notation.
 From SegmentQueue.lib.concurrent_linked_list.infinite_array
      Require Import array_spec iterator.iterator_impl.

@@ -241,8 +241,6 @@ Proof.
   all: destruct state; simpl; try done; try apply None_least.
 Qed.
 
-From stdpp Require Import numbers.
-
 Theorem callback_invokation_permit_exclusive γ q:
   callback_invokation_permit γ 1%Qp -∗ callback_invokation_permit γ q -∗ False.
 Proof.
