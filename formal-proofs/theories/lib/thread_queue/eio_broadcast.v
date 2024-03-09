@@ -1,7 +1,6 @@
 From SegmentQueue.util Require Import
   everything local_updates big_opL cmra count_matching find_index.
 
-Require Import SegmentQueue.lib.util.getAndSet.
 From iris.heap_lang Require Import notation.
 From SegmentQueue.lib.concurrent_linked_list.infinite_array
      Require Import array_spec iterator.iterator_impl.
@@ -1563,7 +1562,7 @@ Qed. *)
    The question is then how do they update the logical state? 
    DONE they use big_sepL_insert_acc
    TODO also remove logically atomicity *)
-Lemma read_cell_value_by_suspender_spec γtq γa γe γd i (ptr: loc):
+(* Lemma read_cell_value_by_suspender_spec γtq γa γe γd i (ptr: loc):
   (* this should imply that the value is not yet taken *)
   rendezvous_filled_value γtq #() i -∗
   (* this is used to read from the infinite array *)
@@ -1616,7 +1615,7 @@ Proof.
       apply lookup_lt_is_Some. eexists. by apply HEl.
     + iSplit; first by iPureIntro.
       by iApply "HRR".
-Qed.
+Qed. *)
 
 (* WHOLE OPERATIONS ON THE THREAD QUEUE ****************************************)
 
