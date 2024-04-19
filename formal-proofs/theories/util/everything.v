@@ -1,4 +1,3 @@
-From iris.heap_lang Require Import proofmode notation lang.
 From iris.algebra Require Import cmra auth list agree csum excl gset frac numbers.
 
 Lemma map_lookup: forall {A B: Type} (f: A -> B) l i, map f l !! i = option_map f (l !! i).
