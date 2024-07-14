@@ -1,0 +1,389 @@
+extra-files: [
+  [
+    "sha512=b501737b4dbd22adc1c0377d744448056fb1dc493caf72c05f57c8463cf23f758373605ab3a50b9f505e4c856c41039d0bd7f81f96ed62adc6a674179523e7d2"
+    "YmluOiBbCiAgImJpbi9jb3F3YyIKICAiYmluL2NvcXRvcCIKICAiYmluL2NvcXRvcC5ieXRlIgogICJiaW4vY29xZG9jIgogICJiaW4vY29xZGVwIgogICJiaW4vY29xY2hrIgogICJiaW4vY29xYyIKICAiYmluL2NvcV9tYWtlZmlsZSIKICAiYmluL2NvcS10ZXgiCiAgImJpbi9jb3F3b3JrbWdyIgpdCg=="
+  ]
+  [
+    "md5=3cddbf72164c29d4e50e077a92a37c6c"
+    "ZGlmZiBhL2NvbmZpZ3VyZSBiL2NvbmZpZ3VyZQotLS0gYS9jb25maWd1cmUKKysrIGIvY29uZmlndXJlCkBAIC0yOTQsNyArMjk0LDcgQEAKICAgICAjIElmIGZpbmRsaWIgaGFzIGJlZW4gY29uZmlndXJlZCAtc2l0ZWxpYiAkKG9jYW1sYyAtd2hlcmUpIHRoZW4gdGhlcmUncwogICAgICMgbm90aGluZyB0byBkbywgYnV0IG90aGVyd2lzZSB3ZSBuZWVkIHRvIHB1dCBPQ2FtbCdzIFN0YW5kYXJkIExpYnJhcnkKICAgICAjIGludG8gdGhlIHBhdGggc2V0dGluZy4KLSAgICBpZiBbICEgLWUgIiR7b2NhbWxfc2l0ZWxpYn0vc3RkbGliL01FVEEiIF07IHRoZW4KKyAgICBpZiBbICEgLWUgIiR7b2NhbWxfc2l0ZWxpYn0vc3RkbGliLmNtaSIgXTsgdGhlbgogICAgICAgICBvY2FtbHBhdGg9IiR7b2NhbWxfY29yZV9zdGRsaWJ9JHtwYXRoX3NlcH0ke29jYW1scGF0aH0iCiAgICAgZmkKIGZpCg=="
+  ]
+  [
+    "md5=3e969b841df1f51ca448e6e6295cb451"
+    "c2hhcmVfcm9vdDogWyJjb25maWcuY2FjaGUiIHsib2NhbWwvY29uZmlnLmNhY2hlIn1dCg=="
+  ]
+  [
+    "md5=71f88c92be191cf4a0547f3c6196ef00"
+    "bGV0ICgpID0KICBsZXQgb2NhbWxfdmVyc2lvbiA9CiAgICBsZXQgdiA9IFN5cy5vY2FtbF92ZXJzaW9uIGluCiAgICB0cnkgU3RyaW5nLnN1YiB2IDAgKFN0cmluZy5pbmRleCB2ICcrJykgd2l0aCBOb3RfZm91bmQgLT4gdgogIGluCiAgaWYgb2NhbWxfdmVyc2lvbiA8PiBTeXMuYXJndi4oMSkgdGhlbgogICAgKFByaW50Zi5lcHJpbnRmCiAgICAgICAiT0NhbWwgdmVyc2lvbiBtaXNtYXRjaDogJSVzLCBleHBlY3RlZCAlcyIKICAgICAgIG9jYW1sX3ZlcnNpb24gU3lzLmFyZ3YuKDEpOwogICAgIGV4aXQgMSkKICBlbHNlCiAgbGV0IG9jID0gb3Blbl9vdXQgKFN5cy5hcmd2LigyKSBeICIuY29uZmlnIikgaW4KICBsZXQgZXhlID0gIi5leGUiIGluCiAgbGV0IChvY2FtbCwgc3VmZml4KSA9CiAgICBsZXQgcyA9IFN5cy5leGVjdXRhYmxlX25hbWUgaW4KICAgIGlmIEZpbGVuYW1lLmNoZWNrX3N1ZmZpeCBzIGV4ZSB0aGVuCiAgICAgIChGaWxlbmFtZS5jaG9wX3N1ZmZpeCBzIGV4ZSwgZXhlKQogICAgZWxzZQogICAgICAocywgIiIpCiAgaW4KICBsZXQgb2NhbWxjID0gb2NhbWxeImMiXnN1ZmZpeCBpbgogIGxldCBsaWJkaXIgPQogICAgaWYgU3lzLmNvbW1hbmQgKG9jYW1sY14iIC13aGVyZSA+IHdoZXJlIikgPSAwIHRoZW4KICAgICAgKCogTXVzdCBiZSBvcGVuZWQgaW4gdGV4dCBtb2RlIGZvciBXaW5kb3dzICopCiAgICAgIGxldCBpYyA9IG9wZW5faW4gIndoZXJlIiBpbgogICAgICBsZXQgciA9IGlucHV0X2xpbmUgaWMgaW4KICAgICAgY2xvc2VfaW4gaWM7IHIKICAgIGVsc2UKICAgICAgZmFpbHdpdGggIkJhZCByZXR1cm4gZnJvbSAnb2NhbWxjIC13aGVyZSciCiAgaW4KICBsZXQgc3R1YnNkaXIgPQogICAgbGV0IGljID0gb3Blbl9pbiAoRmlsZW5hbWUuY29uY2F0IGxpYmRpciAibGQuY29uZiIpIGluCiAgICBsZXQgcmVjIHIgYWNjID0gdHJ5IHIgKGlucHV0X2xpbmUgaWM6OmFjYykgd2l0aCBFbmRfb2ZfZmlsZSAtPiBhY2MgaW4KICAgIGxldCBsaW5lcyA9IExpc3QucmV2IChyIFtdKSBpbgogICAgY2xvc2VfaW4gaWM7CiAgICBTdHJpbmcuY29uY2F0ICI6IiBsaW5lcwogIGluCiAgbGV0IHAgZm10ID0gUHJpbnRmLmZwcmludGYgb2MgKGZtdCBeXiAiXG4iKSBpbgogIHAgIm9wYW0tdmVyc2lvbjogXCIyLjBcIiI7CiAgcCAidmFyaWFibGVzIHsiOwogIHAgIiAgbmF0aXZlOiAlJWIiCiAgICAoU3lzLmZpbGVfZXhpc3RzIChvY2FtbF4ib3B0Il5zdWZmaXgpKTsKICBwICIgIG5hdGl2ZS10b29sczogJSViIgogICAgKFN5cy5maWxlX2V4aXN0cyAob2NhbWxjXiIub3B0Il5zdWZmaXgpKTsKICBwICIgIG5hdGl2ZS1keW5saW5rOiAlJWIiCiAgICAoU3lzLmZpbGVfZXhpc3RzIChGaWxlbmFtZS5jb25jYXQgbGliZGlyICJkeW5saW5rLmNteGEiKSk7CiAgcCAiICBzdHVic2RpcjogJSVTIgogICAgc3R1YnNkaXI7CiAgcCAiICBwcmVpbnN0YWxsZWQ6ICV7b2NhbWwtc3lzdGVtOmluc3RhbGxlZH0lIjsKICBwICIgIGNvbXBpbGVyOiBcIiV7b2NhbWwtc3lzdGVtOmluc3RhbGxlZD9zeXN0ZW06fSUle29jYW1sLWJhc2UtY29tcGlsZXI6dmVyc2lvbn0lJXtvY2FtbC12YXJpYW50czp2ZXJzaW9ufSVcIiI7CiAgcCAifSI7CiAgY2xvc2Vfb3V0IG9jCg=="
+  ]
+  [
+    "md5=8e50c5e2517d3463b3aad649748cafd7"
+    "c2hhcmU6IFsiZ2VuX29jYW1sX2NvbmZpZy5tbCJdCg=="
+  ]
+]
+opam-version: "2.0"
+compiler: ["ocaml-base-compiler.4.11.1"]
+roots: [
+  "coq-iris.dev.2020-08-07.0.dc3d182b" "num.1.4" "ocaml-base-compiler.4.11.1"
+]
+installed: [
+  "base-bigarray.base"
+  "base-threads.base"
+  "base-unix.base"
+  "conf-findutils.1"
+  "coq.8.12.2"
+  "coq-iris.dev.2020-08-07.0.dc3d182b"
+  "coq-stdpp.dev.2020-08-07.0.67db2f24"
+  "num.1.4"
+  "ocaml.4.11.1"
+  "ocaml-base-compiler.4.11.1"
+  "ocaml-config.1"
+  "ocamlfind.1.9.6"
+]
+pinned: "num.1.4"
+package "base-bigarray" {
+  opam-version: "2.0"
+  version: "base"
+  synopsis: ""
+  description: "Bigarray library distributed with the OCaml compiler"
+  maintainer: "https://github.com/ocaml/opam-repository/issues"
+}
+package "base-threads" {
+  opam-version: "2.0"
+  version: "base"
+  synopsis: ""
+  description: "Threads library distributed with the OCaml compiler"
+  maintainer: "https://github.com/ocaml/opam-repository/issues"
+}
+package "base-unix" {
+  opam-version: "2.0"
+  version: "base"
+  synopsis: ""
+  description: "Unix library distributed with the OCaml compiler"
+  maintainer: "https://github.com/ocaml/opam-repository/issues"
+}
+package "conf-findutils" {
+  opam-version: "2.0"
+  version: "1"
+  synopsis: "Virtual package relying on findutils"
+  description:
+    "This package can only install if the findutils binary is installed on the system."
+  authors: "GNU Project"
+  license: "GPL-3.0-or-later"
+  homepage: "https://www.gnu.org/software/findutils/"
+  bug-reports: "https://github.com/ocaml/opam-repository/issues"
+  flags: conf
+  build: ["sh" "-exc" "find . -name ."]
+  depexts: [
+    ["findutils"] {os-family = "debian"}
+    ["findutils"] {os-family = "ubuntu"}
+    ["findutils"] {os-distribution = "fedora"}
+    ["findutils"] {os-distribution = "rhel"}
+    ["findutils"] {os-distribution = "centos"}
+    ["findutils"] {os-distribution = "alpine"}
+    ["findutils"] {os-distribution = "nixos"}
+    ["findutils"] {os-family = "suse" | os-family = "opensuse"}
+    ["findutils"] {os-distribution = "ol"}
+    ["findutils"] {os-distribution = "arch"}
+    ["system:findutils"] {os = "win32" & os-distribution = "cygwinports"}
+    ["findutils"] {os = "freebsd"}
+  ]
+}
+package "coq" {
+  opam-version: "2.0"
+  version: "8.12.2"
+  synopsis: "Formal proof management system"
+  description: """\
+The Coq proof assistant provides a formal language to write
+mathematical definitions, executable algorithms, and theorems, together
+with an environment for semi-interactive development of machine-checked
+proofs. Typical applications include the certification of properties of programming
+languages (e.g., the CompCert compiler certification project and the
+Bedrock verified low-level programming library), the formalization of
+mathematics (e.g., the full formalization of the Feit-Thompson theorem
+and homotopy type theory) and teaching."""
+  maintainer: "coqdev@inria.fr"
+  authors: "The Coq development team, INRIA, CNRS, and contributors."
+  license: "LGPL-2.1-only"
+  homepage: "https://coq.inria.fr/"
+  bug-reports: "https://github.com/coq/coq/issues"
+  depends: [
+    "ocaml" {>= "4.05.0" & < "4.12"}
+    "ocamlfind" {build}
+    "num"
+    "conf-findutils" {build}
+  ]
+  depopts: ["coq-native"]
+  build: [
+    [
+      "./configure"
+      "-configdir"
+      "%{lib}%/coq/config"
+      "-prefix"
+      prefix
+      "-mandir"
+      man
+      "-docdir"
+      doc
+      "-libdir"
+      "%{lib}%/coq"
+      "-datadir"
+      "%{share}%/coq"
+      "-coqide"
+      "no"
+      "-native-compiler"
+      "yes" {coq-native:installed}
+      "no" {!coq-native:installed}
+    ]
+    [make "COQ_USE_DUNE=" "-j%{jobs}%"]
+    [make "COQ_USE_DUNE=" "-j%{jobs}%" "byte"]
+  ]
+  install: [
+    [make "COQ_USE_DUNE=" "install"]
+    [make "COQ_USE_DUNE=" "install-byte"]
+  ]
+  dev-repo: "git+https://github.com/coq/coq.git"
+  extra-files: [
+    "coq.install"
+    "sha512=b501737b4dbd22adc1c0377d744448056fb1dc493caf72c05f57c8463cf23f758373605ab3a50b9f505e4c856c41039d0bd7f81f96ed62adc6a674179523e7d2"
+  ]
+  url {
+    src: "https://github.com/coq/coq/archive/V8.12.2.tar.gz"
+    checksum:
+      "sha512=6b524edbceb5795f04bbd2b52f191bfcf10b611f7a2fa0450c30b72c944f88418d261729476b64603faacfe2be5f7992a2997541e54e6f8691d4dc8b4969198d"
+  }
+}
+package "coq-iris" {
+  opam-version: "2.0"
+  version: "dev.2020-08-07.0.dc3d182b"
+  synopsis:
+    "Iris is a Higher-Order Concurrent Separation Logic Framework with support for interactive proofs"
+  maintainer: "Ralf Jung <jung@mpi-sws.org>"
+  authors: "The Iris Team"
+  license: "BSD-3-Clause"
+  homepage: "https://iris-project.org/"
+  bug-reports: "https://gitlab.mpi-sws.org/iris/iris/issues"
+  depends: [
+    "coq" {(>= "8.9.1" & < "8.13~") | (= "dev")}
+    "coq-stdpp" {(= "dev.2020-08-07.0.67db2f24") | (= "dev")}
+  ]
+  build: [make "-j%{jobs}%"]
+  install: [make "install"]
+  dev-repo: "git+https://gitlab.mpi-sws.org/iris/iris.git"
+  url {
+    src:
+      "git+https://gitlab.mpi-sws.org/iris/iris.git#dc3d182b27672798c6df7cd72988a3ab37e793ed"
+  }
+}
+package "coq-stdpp" {
+  opam-version: "2.0"
+  version: "dev.2020-08-07.0.67db2f24"
+  synopsis: "std++ is an extended \"Standard Library\" for Coq"
+  description: """\
+The key features of this library are as follows:
+
+- It provides a great number of definitions and lemmas for common data
+  structures such as lists, finite maps, finite sets, and finite multisets.
+- It uses type classes for common notations (like `∅`, `∪`, and Haskell-style
+  monad notations) so that these can be overloaded for different data structures.
+- It uses type classes to keep track of common properties of types, like it
+  having decidable equality or being countable or finite.
+- Most data structures are represented in canonical ways so that Leibniz
+  equality can be used as much as possible (for example, for maps we have
+  `m1 = m2` iff `∀ i, m1 !! i = m2 !! i`). On top of that, the library provides
+  setoid instances for most types and operations.
+- It provides various tactics for common tasks, like an ssreflect inspired
+  `done` tactic for finishing trivial goals, a simple breadth-first solver
+  `naive_solver`, an equality simplifier `simplify_eq`, a solver `solve_proper`
+  for proving compatibility of functions with respect to relations, and a solver
+  `set_solver` for goals involving set operations.
+- It is entirely dependency- and axiom-free."""
+  maintainer: "Ralf Jung <jung@mpi-sws.org>"
+  authors: "The std++ team"
+  license: "BSD-3-Clause"
+  homepage: "https://gitlab.mpi-sws.org/iris/stdpp"
+  bug-reports: "https://gitlab.mpi-sws.org/iris/stdpp/issues"
+  depends: [
+    "coq" {(= "8.8.2") | (>= "8.9.1" & < "8.13~") | (= "dev")}
+  ]
+  build: [make "-j%{jobs}%"]
+  install: [make "install"]
+  dev-repo: "git+https://gitlab.mpi-sws.org/iris/stdpp.git"
+  url {
+    src:
+      "git+https://gitlab.mpi-sws.org/iris/stdpp.git#67db2f248ac8250c6b2de6e4e25701f517ec265c"
+  }
+}
+package "ocaml" {
+  opam-version: "2.0"
+  version: "4.11.1"
+  synopsis: "The OCaml compiler (virtual package)"
+  description: """\
+This package requires a matching implementation of OCaml,
+and polls it to initialise specific variables like `ocaml:native-dynlink`"""
+  maintainer: "platform@lists.ocaml.org"
+  authors: [
+    "Xavier Leroy"
+    "Damien Doligez"
+    "Alain Frisch"
+    "Jacques Garrigue"
+    "Didier Rémy"
+    "Jérôme Vouillon"
+  ]
+  license: "LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception"
+  homepage: "https://ocaml.org"
+  bug-reports: "https://github.com/ocaml/opam-repository/issues"
+  depends: [
+    "ocaml-config"
+    "ocaml-base-compiler" {= "4.11.1"} |
+    "ocaml-variants" {>= "4.11.1" & < "4.11.2~"} |
+    "ocaml-system" {>= "4.11.1" & < "4.11.2~"}
+  ]
+  flags: conf
+  setenv: [
+    [CAML_LD_LIBRARY_PATH = "%{_:stubsdir}%"]
+    [CAML_LD_LIBRARY_PATH += "%{lib}%/stublibs"]
+    [OCAML_TOPLEVEL_PATH = "%{toplevel}%"]
+  ]
+  build: [
+    "ocaml" "%{ocaml-config:share}%/gen_ocaml_config.ml" _:version _:name
+  ]
+  build-env: CAML_LD_LIBRARY_PATH = ""
+}
+package "ocaml-base-compiler" {
+  opam-version: "2.0"
+  version: "4.11.1"
+  synopsis: "Official release 4.11.1"
+  maintainer: "platform@lists.ocaml.org"
+  authors: "Xavier Leroy and many contributors"
+  license: "LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception"
+  homepage: "https://ocaml.org"
+  bug-reports: "https://github.com/ocaml/opam-repository/issues"
+  depends: [
+    "ocaml" {= "4.11.1" & post}
+    "base-unix" {post}
+    "base-bigarray" {post}
+    "base-threads" {post}
+  ]
+  conflict-class: "ocaml-core-compiler"
+  available: !(os = "macos" & arch = "arm64")
+  flags: compiler
+  setenv: CAML_LD_LIBRARY_PATH = "%{lib}%/stublibs"
+  build: [
+    [
+      "./configure"
+      "--prefix=%{prefix}%"
+      "-C"
+      "CC=cc" {os = "openbsd" | os = "macos"}
+      "ASPP=cc -c" {os = "openbsd" | os = "macos"}
+    ]
+    [make "-j%{jobs}%" "world"]
+    [make "-j%{jobs}%" "world.opt"]
+  ]
+  install: [make "install"]
+  patches: "alt-signal-stack.patch"
+  post-messages: [
+    """\
+A failure in the middle of the build may be caused by build parallelism
+   (enabled by default).
+   Please file a bug report at https://github.com/ocaml/opam-repository/issues"""
+      {failure & jobs > "1"}
+    """\
+You can try installing again including --jobs=1
+   to force a sequential build instead."""
+      {failure & jobs > "1" & opam-version >= "2.0.5"}
+  ]
+  dev-repo: "git+https://github.com/ocaml/ocaml"
+  extra-files: [
+    "ocaml-base-compiler.install" "md5=3e969b841df1f51ca448e6e6295cb451"
+  ]
+  url {
+    src: "https://github.com/ocaml/ocaml/archive/4.11.1.tar.gz"
+    checksum:
+      "sha256=cd3cd55d465028b161c8c33bafc14ee6ae1d91b5efe51098350f8e8a5f454baf"
+  }
+  extra-source "alt-signal-stack.patch" {
+    src:
+      "https://github.com/ocaml/ocaml/commit/dd28ac0cf4365bd0ea1bcc374cbc5e95a6f39bea.patch?full_index=1"
+    checksum:
+      "sha256=e94ff6043dbd47594599a7743b8e97080aef85a1541c5731c04494d19bdabaa7"
+  }
+}
+package "ocaml-config" {
+  opam-version: "2.0"
+  version: "1"
+  synopsis: "OCaml Switch Configuration"
+  description:
+    "This package is used by the OCaml package to set-up its variables."
+  maintainer: "platform@lists.ocaml.org"
+  authors: [
+    "Louis Gesbert <louis.gesbert@ocamlpro.com>"
+    "David Allsopp <david.allsopp@metastack.com>"
+  ]
+  homepage: "https://opam.ocaml.org/"
+  bug-reports: "https://github.com/ocaml/opam/issues"
+  depends: [
+    "ocaml-base-compiler" {>= "3.08.0~"} | "ocaml-variants" {>= "3.08.0~"} |
+    "ocaml-system" {>= "3.08.0~"}
+  ]
+  substs: "gen_ocaml_config.ml"
+  extra-files: [
+    ["gen_ocaml_config.ml.in" "md5=71f88c92be191cf4a0547f3c6196ef00"]
+    ["ocaml-config.install" "md5=8e50c5e2517d3463b3aad649748cafd7"]
+  ]
+}
+package "ocamlfind" {
+  opam-version: "2.0"
+  version: "1.9.6"
+  synopsis: "A library manager for OCaml"
+  description: """\
+Findlib is a library manager for OCaml. It provides a convention how
+to store libraries, and a file format ("META") to describe the
+properties of libraries. There is also a tool (ocamlfind) for
+interpreting the META files, so that it is very easy to use libraries
+in programs and scripts."""
+  maintainer: "Thomas Gazagnaire <thomas@gazagnaire.org>"
+  authors: "Gerd Stolpmann <gerd@gerd-stolpmann.de>"
+  license: "MIT"
+  homepage: "http://projects.camlcity.org/projects/findlib.html"
+  bug-reports: "https://github.com/ocaml/ocamlfind/issues"
+  depends: [
+    "ocaml" {>= "3.08.0"}
+  ]
+  depopts: ["graphics"]
+  available: os != "win32"
+  build: [
+    [
+      "./configure"
+      "-bindir"
+      bin
+      "-sitelib"
+      lib
+      "-mandir"
+      man
+      "-config"
+      "%{lib}%/findlib.conf"
+      "-no-custom"
+      "-no-camlp4" {!ocaml:preinstalled & ocaml:version >= "4.02.0"}
+      "-no-topfind" {ocaml:preinstalled}
+    ]
+    [make "all"]
+    [make "opt"] {ocaml:native}
+  ]
+  install: [
+    [make "install"]
+    ["install" "-m" "0755" "ocaml-stub" "%{bin}%/ocaml"] {ocaml:preinstalled}
+  ]
+  patches: "0001-Harden-test-for-OCaml-5.patch"
+  dev-repo: "git+https://github.com/ocaml/ocamlfind.git"
+  extra-files: [
+    "0001-Harden-test-for-OCaml-5.patch"
+    "md5=3cddbf72164c29d4e50e077a92a37c6c"
+  ]
+  url {
+    src: "http://download.camlcity.org/download/findlib-1.9.6.tar.gz"
+    checksum: [
+      "md5=96c6ee50a32cca9ca277321262dbec57"
+      "sha512=cfaf1872d6ccda548f07d32cc6b90c3aafe136d2aa6539e03143702171ee0199add55269bba894c77115535dc46a5835901a5d7c75768999e72db503bfd83027"
+    ]
+  }
+}
