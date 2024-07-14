@@ -128,8 +128,6 @@ atomically exchanges Φ for Ψ, which means that the ability to increase cancell
                             (▷ segment_content _ _ _ γs n ={E ∖ ↑N, E}=∗ emp);
     }.
 
-Check findSegment_spec.
-
 Existing Instances is_concurrentLinkedList_persistent
          segment_in_list_persistent
          segment_is_cancelled_persistent.
